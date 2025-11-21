@@ -2,6 +2,5 @@
 
 members = [
     "multi_party_ecdsa",
-    "p2p",
     "classgroup",
 ]
