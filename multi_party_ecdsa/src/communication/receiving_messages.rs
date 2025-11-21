@@ -1,22 +1,10 @@
-use crate::protocols::multi_party::dmz21::message::{
-    KeyRefreshMessage, MultiKeyGenMessage, MultiSignMessage,
-};
 use crate::protocols::two_party::message::{
-    DMZPartyOneMsg, DMZPartyTwoMsg, XAXPartyOneMsg, XAXPartyTwoMsg,
+    XAXPartyOneMsg, XAXPartyTwoMsg,
 };
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ReceivingMessages {
-    MultiKeyGenInitSync(usize),
-    MultiKeyGenMessage(MultiKeyGenMessage),
-    KeyRefreshMessage(KeyRefreshMessage),
-    MultiSignInitSync(usize),
-    MultiSignMessage(MultiSignMessage),
-    DMZTwoKeyGenMessagePartyOne(DMZPartyOneMsg),
-    DMZTwoSignMessagePartyOne(DMZPartyOneMsg),
-    DMZTwoKeyGenMessagePartyTwo(DMZPartyTwoMsg),
-    DMZTwoSignMessagePartyTwo(DMZPartyTwoMsg),
     XAXTwoKeyGenMessagePartyOne(XAXPartyOneMsg),
     XAXTwoSignMessagePartyOne(XAXPartyOneMsg),
     XAXTwoKeyGenMessagePartyTwo(XAXPartyTwoMsg),

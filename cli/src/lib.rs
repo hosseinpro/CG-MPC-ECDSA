@@ -2,7 +2,4 @@ pub mod xax21_party_one;
 pub mod xax21_party_two;
 pub mod config;
 pub mod console;
-pub mod ecdsa_keyrefresh;
 pub mod log;
-pub mod dmz21_multi_party_keygen;
-pub mod dmz21_multi_party_sign;
