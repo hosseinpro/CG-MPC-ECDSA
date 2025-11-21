@@ -6,5 +6,3 @@ pub mod ecdsa_keyrefresh;
 pub mod log;
 pub mod dmz21_multi_party_keygen;
 pub mod dmz21_multi_party_sign;
-pub mod dmz21_party_one;
-pub mod dmz21_party_two;
