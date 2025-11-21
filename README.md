@@ -1,5 +1,11 @@
 
 # CG-MPC-ECDSA
+
+test xax21 party_two_test:
+```
+cargo test party_two_test -- --nocapture
+```
+
 [![github license](https://img.shields.io/badge/license-LGPLv3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0.en.html)
 
 This project aims to implement two-party and multi-party ECDSA protocols based on class group with Rust.
