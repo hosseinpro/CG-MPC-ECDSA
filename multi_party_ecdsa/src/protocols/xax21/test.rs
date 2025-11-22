@@ -1,5 +1,4 @@
 use super::*;
-use crate::protocols::xax21::mta::*;
 use crate::utilities::class_group::*;
 use crate::utilities::clkeypair::ClKeyPair;
 use curv::elliptic::curves::secp256_k1::FE;
@@ -10,8 +9,8 @@ fn mta_test() {
     let a = FE::new_random();
     let b = FE::new_random();
     let cl_keypair = ClKeyPair::new(&GROUP_128);
-    let mut mta_party_one = cl_based_mta::PartyOne::new(a);
-    let mut mta_party_two = cl_based_mta::PartyTwo::new(b);
+    let mut mta_party_one = mta::PartyOne::new(a);
+    let mut mta_party_two = mta::PartyTwo::new(b);
     let mta_first_round_msg = mta_party_one.generate_send_msg(&cl_keypair.cl_pub_key);
     let mta_second_round_msg = mta_party_two
         .receive_and_send_msg(mta_first_round_msg.0, mta_first_round_msg.1)
@@ -50,8 +49,8 @@ fn party_two_test() {
     //mta begin;
     let cl_keypair = ClKeyPair::new(&GROUP_128);
     let mut mta_party_one =
-        cl_based_mta::PartyOne::new(party_one_sign.reshared_keypair.secret_share);
-    let mut mta_party_two = cl_based_mta::PartyTwo::new(party_two_sign.nonce_pair.secret_share);
+        mta::PartyOne::new(party_one_sign.reshared_keypair.secret_share);
+    let mut mta_party_two = mta::PartyTwo::new(party_two_sign.nonce_pair.secret_share);
 
     let mta_first_round_msg = mta_party_one.generate_send_msg(&cl_keypair.cl_pub_key);
     let mta_second_round_msg = mta_party_two
