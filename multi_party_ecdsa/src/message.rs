@@ -1,5 +1,5 @@
-use crate::protocols::xax21::party_one::{MtaConsistencyMsg, NonceKEMsg};
-use crate::protocols::xax21::party_two::KeyGenSecRoungMsg;
+use crate::party_one::{MtaConsistencyMsg, NonceKEMsg};
+use crate::party_two::KeyGenSecRoungMsg;
 use crate::utilities::cl_proof::*;
 use crate::utilities::class_group::*;
 use crate::utilities::dl_com_zk::*;

@@ -1,6 +1,6 @@
-use crate::protocols::xax21::mta::PartyOne;
-use crate::protocols::xax21::party_two::KeyGenSecRoungMsg;
-use crate::protocols::message::*;
+use crate::mta::PartyOne;
+use crate::party_two::KeyGenSecRoungMsg;
+use crate::message::*;
 use crate::utilities::dl_com_zk::*;
 use crate::utilities::eckeypair::EcKeyPair;
 //use crate::utilities::clkeypair::ClKeyPair;
