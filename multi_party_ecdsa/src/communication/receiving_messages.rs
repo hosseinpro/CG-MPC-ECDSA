@@ -1,4 +1,4 @@
-use crate::protocols::two_party::message::{
+use crate::protocols::message::{
     XAXPartyOneMsg, XAXPartyTwoMsg,
 };
 use serde::{Deserialize, Serialize};

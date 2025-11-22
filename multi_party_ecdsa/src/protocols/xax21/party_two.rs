@@ -1,8 +1,8 @@
 use crate::communication::receiving_messages::ReceivingMessages;
 use crate::communication::sending_messages::SendingMessages;
-use crate::protocols::two_party::xax21::mta::cl_based_mta::PartyTwo;
-use crate::protocols::two_party::xax21::party_one::{MtaConsistencyMsg, NonceKEMsg};
-use crate::protocols::two_party::message::*;
+use crate::protocols::xax21::mta::cl_based_mta::PartyTwo;
+use crate::protocols::xax21::party_one::{MtaConsistencyMsg, NonceKEMsg};
+use crate::protocols::message::*;
 use crate::utilities::dl_com_zk::*;
 use crate::utilities::eckeypair::EcKeyPair;
 use crate::utilities::error::MulEcdsaError;
