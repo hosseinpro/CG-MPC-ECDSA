@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum XAXPartyOneMsg {
-    KeyGenInitSync(usize),
-    SignInitSync(usize),
     KeyGenPartyOneRoundOneMsg(DLCommitments),
     KeyGenPartyOneRoundTwoMsg(CommWitness),
     MtaPartyOneRoundOneMsg((CLProof, CLState)),
@@ -18,9 +16,7 @@ pub enum XAXPartyOneMsg {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum XAXPartyTwoMsg {
-    KeyGenInitSync(usize),
     KeyGenFinish,
-    SignInitSync(usize),
     KeyGenPartyTwoRoundOneMsg(KeyGenSecRoungMsg),
     SignPartyTwoRoundOneMsg(DLCommitments),
     MtaPartyTwoRoundOneMsg(Ciphertext),
