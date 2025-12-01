@@ -1,13 +1,7 @@
-use crate::mta::PartyOne;
 use crate::party_two::KeyGenSecRoungMsg;
-use crate::message::*;
 use crate::utilities::dl_com_zk::*;
 use crate::utilities::eckeypair::EcKeyPair;
-//use crate::utilities::clkeypair::ClKeyPair;
 use crate::utilities::signature::*;
-//use crate::utilities::class_group::*;
-use crate::communication::receiving_messages::ReceivingMessages;
-use crate::communication::sending_messages::SendingMessages;
 use crate::utilities::error::MulEcdsaError;
 use k256::{Scalar, ProjectivePoint};
 use k256::elliptic_curve::Field;
@@ -94,47 +88,6 @@ impl KeyGen {
         KeyGenResult {
             keypair: self.keypair.clone(),
             public_signing_key: self.public_share_rec + self.keypair.public_share,
-        }
-    }
-
-    pub fn process_begin_keygen(&mut self, index: usize) -> Result<SendingMessages, MulEcdsaError> {
-        if index == 0 {
-            let msg_send = ReceivingMessages::XAXTwoKeyGenMessagePartyOne(
-                XAXPartyOneMsg::KeyGenPartyOneRoundOneMsg(self.generate_first_round_msg()),
-            );
-            let msg_bytes =
-                bincode::serialize(&msg_send).map_err(|_| MulEcdsaError::SerializeFailed)?;
-            return Ok(SendingMessages::BroadcastMessage(msg_bytes));
-        } else {
-            log::warn!("Please use index 0 party begin the sign...");
-            return Ok(SendingMessages::EmptyMsg);
-        }
-    }
-
-    pub fn msg_handler_keygen(
-        &mut self,
-        msg_received: &XAXPartyTwoMsg,
-    ) -> Result<SendingMessages, MulEcdsaError> {
-        match msg_received {
-            XAXPartyTwoMsg::KeyGenPartyTwoRoundOneMsg(msg) => {
-                log::info!("KeyGen: Receiving RoundOneMsg from index 1");
-                let com_open = self.get_msg_and_generate_third_roung_msg(msg)?;
-                let msg_send = ReceivingMessages::XAXTwoKeyGenMessagePartyOne(
-                    XAXPartyOneMsg::KeyGenPartyOneRoundTwoMsg(com_open),
-                );
-                let msg_bytes =
-                    bincode::serialize(&msg_send).map_err(|_| MulEcdsaError::SerializeFailed)?;
-
-                return Ok(SendingMessages::BroadcastMessage(msg_bytes));
-            }
-            XAXPartyTwoMsg::KeyGenFinish => {
-                log::info!("KeyGen: Receiving KeyGenFinish from index 1");
-                let keygen_result = self.generate_key_result();
-                let keygen_json = serde_json::to_string(&keygen_result)
-                    .map_err(|_| MulEcdsaError::ToStringFailed)?;
-                return Ok(SendingMessages::KeyGenSuccessWithResult(vec![keygen_json]));
-            }
-            _ => return Ok(SendingMessages::EmptyMsg),
         }
     }
 }
@@ -231,66 +184,6 @@ impl Sign {
             &self.message,
         )?;
         return Ok(signature);
-    }
-
-    pub fn msg_handler_sign(
-        &mut self,
-        msg_received: &XAXPartyTwoMsg,
-        mta_party_one: &mut PartyOne,
-    ) -> Result<SendingMessages, MulEcdsaError> {
-        //let cl_keypair = ClKeyPair::new(&GROUP_128);
-        match msg_received {
-            XAXPartyTwoMsg::SignPartyTwoRoundOneMsg(msg) => {
-                log::info!("Sign: Receiving RoundOneMsg from index 1");
-                self.get_nonce_com(msg);
-                let mta_first_round_msg =
-                    mta_party_one.generate_send_msg(&mta_party_one.cl_keypair.cl_pub_key);
-                let msg_send = ReceivingMessages::XAXTwoSignMessagePartyOne(
-                    XAXPartyOneMsg::MtaPartyOneRoundOneMsg(mta_first_round_msg),
-                );
-                let msg_bytes =
-                    bincode::serialize(&msg_send).map_err(|_| MulEcdsaError::SerializeFailed)?;
-                return Ok(SendingMessages::BroadcastMessage(msg_bytes));
-            }
-            XAXPartyTwoMsg::MtaPartyTwoRoundOneMsg(msg) => {
-                mta_party_one
-                    .handle_receive_msg(&mta_party_one.clone().cl_keypair.cl_priv_key, msg);
-                let mta_consistency_msg = self.generate_mta_consistency(mta_party_one.t_b);
-                let party_one_nonce_ke_msg = self.generate_nonce_ke_msg();
-                let msg_send = ReceivingMessages::XAXTwoSignMessagePartyOne(
-                    XAXPartyOneMsg::SignPartyOneRoundOneMsg(
-                        mta_consistency_msg,
-                        party_one_nonce_ke_msg,
-                    ),
-                );
-                let msg_bytes =
-                    bincode::serialize(&msg_send).map_err(|_| MulEcdsaError::SerializeFailed)?;
-                return Ok(SendingMessages::BroadcastMessage(msg_bytes));
-            }
-            XAXPartyTwoMsg::SignPartyTwoRoundTwoMsg(noncekemsg, s_2) => {
-                self.verify_nonce_ke_msg(noncekemsg).unwrap();
-                let signature = self.online_sign(s_2).unwrap();
-                println!("signature = {:?}", signature);
-                let signature_json = serde_json::to_string(&signature)
-                    .map_err(|_| MulEcdsaError::GenerateJsonStringFailed)?;
-                return Ok(SendingMessages::SignSuccessWithResult(signature_json));
-            }
-            XAXPartyTwoMsg::SignPartyTwoRoundTwoMsgOnline(msg) => {
-                self.verify_nonce_ke_msg(msg).unwrap();
-                Ok(SendingMessages::EmptyMsg)
-            }
-            XAXPartyTwoMsg::SignPartyTwoRoundThreeMsgOnline(msg) => {
-                let signature = self.online_sign(msg).unwrap();
-                println!("signature = {:?}", signature);
-                let signature_json = serde_json::to_string(&signature)
-                    .map_err(|_| MulEcdsaError::GenerateJsonStringFailed)?;
-                return Ok(SendingMessages::SignSuccessWithResult(signature_json));
-            }
-            _ => {
-                log::warn!("Unsupported parse Received MessageType");
-                return Ok(SendingMessages::EmptyMsg);
-            }
-        }
     }
 }
 

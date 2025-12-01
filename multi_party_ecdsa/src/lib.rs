@@ -1,4 +1,3 @@
-pub mod communication;
 pub mod utilities;
 pub mod mta;
 pub mod party_one;
