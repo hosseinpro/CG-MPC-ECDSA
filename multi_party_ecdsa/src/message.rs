@@ -3,7 +3,7 @@ use crate::party_two::KeyGenSecRoungMsg;
 use crate::utilities::cl_proof::*;
 use crate::utilities::class_group::*;
 use crate::utilities::dl_com_zk::*;
-use curv::elliptic::curves::secp256_k1::FE;
+use k256::Scalar;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -20,7 +20,7 @@ pub enum XAXPartyTwoMsg {
     KeyGenPartyTwoRoundOneMsg(KeyGenSecRoungMsg),
     SignPartyTwoRoundOneMsg(DLCommitments),
     MtaPartyTwoRoundOneMsg(Ciphertext),
-    SignPartyTwoRoundTwoMsg(CommWitness, FE),
+    SignPartyTwoRoundTwoMsg(CommWitness, Scalar),
     SignPartyTwoRoundTwoMsgOnline(CommWitness),
-    SignPartyTwoRoundThreeMsgOnline(FE),
+    SignPartyTwoRoundThreeMsgOnline(Scalar),
 }

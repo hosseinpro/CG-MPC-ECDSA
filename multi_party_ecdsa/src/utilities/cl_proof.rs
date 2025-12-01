@@ -4,13 +4,13 @@ use crate::utilities::SECURITY_PARAMETER;
 use classgroup::gmp::mpz::Mpz;
 use classgroup::gmp_classgroup::*;
 use classgroup::ClassGroup;
-use curv::arithmetic::traits::*;
-use curv::cryptographic_primitives::hashing::hash_sha256::HSha256;
-use curv::cryptographic_primitives::hashing::traits::Hash;
-use curv::elliptic::curves::secp256_k1::FE;
-use curv::elliptic::curves::traits::*;
-use curv::BigInt;
+use k256::Scalar;
+use k256::elliptic_curve::Field; 
+use num_bigint::{BigInt, Sign};
+use num_traits::One;
+use sha2::{Sha256, Digest};
 use serde::{Deserialize, Serialize};
+use rand::rngs::OsRng;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CLState {
@@ -20,7 +20,7 @@ pub struct CLState {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CLWit {
-    pub x: FE,
+    pub x: Scalar,
     pub r: SK,
 }
 
@@ -34,14 +34,13 @@ pub struct CLProof {
 
 impl CLProof {
     pub fn prove(group: &CLGroup, witness: CLWit, statement: CLState) -> Self {
-        let r1 = BigInt::sample_below(
-            &(&mpz_to_bigint(group.stilde.clone())
-                * BigInt::from(2).pow(40)
-                * BigInt::from(2).pow(SECURITY_PARAMETER as u32)
-                * BigInt::from(2).pow(40)),
-        );
+        let upper = &mpz_to_bigint(group.stilde.clone())
+            * BigInt::from(2i32).pow(40)
+            * BigInt::from(2i32).pow(SECURITY_PARAMETER as u32)
+            * BigInt::from(2i32).pow(40);
+        let r1 = sample_below(&upper);
         let r1_mpz = bigint_to_mpz(r1);
-        let r2_fe: FE = FE::new_random();
+        let r2_fe = Scalar::random(&mut OsRng);
         let r2 = into_mpz(&r2_fe);
         let fr2 = expo_f(&q(), &group.gq.discriminant(), &r2);
         let mut pkr1 = statement.cl_pub_key.0.clone();
@@ -56,10 +55,11 @@ impl CLProof {
             &statement.cipher,
         );
         let u1 = r1_mpz + &bigint_to_mpz(k.clone()) * &witness.r.0;
-        let u2 = BigInt::mod_add(
+        let q_bigint = mpz_to_bigint(q());
+        let u2 = mod_add(
             &mpz_to_bigint(r2),
-            &(&k * witness.x.to_big_int()),
-            &FE::q(),
+            &(&k * scalar_to_bigint(&witness.x)),
+            &q_bigint,
         );
 
         Self {
@@ -77,18 +77,16 @@ impl CLProof {
         t2: GmpClassGroup,
         ciphertext: &Ciphertext,
     ) -> BigInt {
-        let hash256 = HSha256::create_hash(&[
-            // hash the statement i.e. the discrete log of Q is encrypted in (c1,c2) under encryption key h.
-            &BigInt::from_bytes(ciphertext.c1.to_bytes().as_ref()),
-            &BigInt::from_bytes(ciphertext.c2.to_bytes().as_ref()),
-            &BigInt::from_bytes(public_key.0.to_bytes().as_ref()),
-            // hash Sigma protocol commitments
-            &BigInt::from_bytes(t1.to_bytes().as_ref()),
-            &BigInt::from_bytes(t2.to_bytes().as_ref()),
-        ]);
+        let mut hasher = Sha256::new();
+        hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&ciphertext.c1.to_bytes()));
+        hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&ciphertext.c2.to_bytes()));
+        hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&public_key.0.to_bytes()));
+        hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&t1.to_bytes()));
+        hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&t2.to_bytes()));
+        let hash256 = hasher.finalize();
 
-        let hash128 = &BigInt::to_bytes(&hash256)[..SECURITY_PARAMETER / 8];
-        BigInt::from_bytes(hash128)
+        let hash128 = &hash256[..SECURITY_PARAMETER / 8];
+        BigInt::from_bytes_be(Sign::Plus, hash128)
     }
 
     pub fn verify(&self, group: &CLGroup, statement: CLState) -> Result<(), MulEcdsaError> {
@@ -103,9 +101,9 @@ impl CLProof {
         );
 
         let sample_size = &mpz_to_bigint(group.stilde.clone())
-            * (BigInt::from(2).pow(40))
-            * BigInt::from(2).pow(SECURITY_PARAMETER as u32)
-            * (BigInt::from(2).pow(40) + BigInt::one());
+            * BigInt::from(2i32).pow(40)
+            * BigInt::from(2i32).pow(SECURITY_PARAMETER as u32)
+            * (BigInt::from(2i32).pow(40) + BigInt::one());
 
         //length test u1:
         if &self.u1 > &bigint_to_mpz(sample_size) || &self.u1 < &Mpz::zero() {

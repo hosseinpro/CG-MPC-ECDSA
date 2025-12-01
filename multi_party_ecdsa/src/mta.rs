@@ -1,29 +1,29 @@
 use crate::utilities::cl_proof::*;
 use crate::utilities::class_group::*;
 use crate::utilities::clkeypair::*;
-use curv::arithmetic::*;
-use curv::elliptic::curves::secp256_k1::FE;
-use curv::elliptic::curves::traits::*;
+use k256::Scalar;
+use k256::elliptic_curve::Field;
+use rand::rngs::OsRng;
 
 #[derive(Clone, Debug)]
 pub struct PartyOne {
-    pub b: FE,
-    pub t_b: FE,
+    pub b: Scalar,
+    pub t_b: Scalar,
     pub cl_keypair: ClKeyPair,
 }
 
 #[derive(Clone, Debug)]
 pub struct PartyTwo {
-    pub a: FE,
-    pub t_a: FE,
+    pub a: Scalar,
+    pub t_a: Scalar,
 }
 
 impl PartyOne {
-    pub fn new(b: FE) -> Self {
+    pub fn new(b: Scalar) -> Self {
         let cl_keypair = ClKeyPair::new(&GROUP_128);
         Self {
             b,
-            t_b: FE::new_random(),
+            t_b: Scalar::random(&mut OsRng),
             cl_keypair,
         }
     }
@@ -40,17 +40,15 @@ impl PartyOne {
     }
 
     pub fn handle_receive_msg(&mut self, cl_sk: &SK, c_a: &Ciphertext) {
-        let beta_tag_bigint = CLGroup::decrypt(&GROUP_128, cl_sk, c_a).to_big_int();
-        let beta: FE = ECScalar::from(&beta_tag_bigint.mod_floor(&FE::q()));
-        self.t_b = beta;
+        self.t_b = CLGroup::decrypt(&GROUP_128, cl_sk, c_a);
     }
 }
 
 impl PartyTwo {
-    pub fn new(a: FE) -> Self {
+    pub fn new(a: Scalar) -> Self {
         Self {
             a,
-            t_a: FE::new_random(),
+            t_a: Scalar::random(&mut OsRng),
         }
     }
 
@@ -59,8 +57,8 @@ impl PartyTwo {
         proof_cl: CLProof,
         statement: CLState,
     ) -> Result<Ciphertext, String> {
-        let alpha_tag = FE::new_random();
-        let alpha = FE::zero().sub(&alpha_tag.get_element());
+        let alpha_tag = Scalar::random(&mut OsRng);
+        let alpha = -alpha_tag;
         self.t_a = alpha;
 
         //verify cl-encryption dl proof

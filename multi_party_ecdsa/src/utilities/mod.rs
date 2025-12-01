@@ -8,3 +8,4 @@ pub mod eckeypair;
 pub mod error;
 pub mod signature;
 pub mod cl_proof;
+pub mod k256_helpers;

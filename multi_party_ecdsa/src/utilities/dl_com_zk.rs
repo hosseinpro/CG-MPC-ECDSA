@@ -1,13 +1,10 @@
 use crate::utilities::eckeypair::EcKeyPair;
 use crate::utilities::error::MulEcdsaError;
 use crate::utilities::SECURITY_BITS;
-use curv::arithmetic::traits::*;
-use curv::cryptographic_primitives::commitments::hash_commitment::HashCommitment;
-use curv::cryptographic_primitives::commitments::traits::Commitment;
-use curv::cryptographic_primitives::proofs::sigma_dlog::*;
-use curv::elliptic::curves::secp256_k1::GE;
-use curv::elliptic::curves::traits::*;
-use curv::BigInt;
+use crate::utilities::k256_helpers::*;
+use k256::ProjectivePoint;
+use num_bigint::BigInt;
+use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -19,7 +16,8 @@ pub struct DlogCommitment {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DlogCommitmentOpen {
     pub blind_factor: BigInt,
-    pub public_share: GE,
+    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
+    pub public_share: ProjectivePoint,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -38,14 +36,15 @@ pub struct DLCommitments {
 pub struct CommWitness {
     pub pk_commitment_blind_factor: BigInt,
     pub zk_pok_blind_factor: BigInt,
-    pub public_share: GE,
-    pub d_log_proof: DLogProof<GE>,
+    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
+    pub public_share: ProjectivePoint,
+    pub d_log_proof: DLogProof<ProjectivePoint>,
 }
 
 impl DlogCommitment {
-    pub fn new(public_share: &GE) -> Self {
-        let blind_factor = BigInt::sample(SECURITY_BITS);
-        let commitment = HashCommitment::create_commitment_with_user_defined_randomness(
+    pub fn new(public_share: &ProjectivePoint) -> Self {
+        let blind_factor = sample_bigint(SECURITY_BITS);
+        let commitment = create_hash_commitment(
             &public_share.bytes_compressed_to_big_int(),
             &blind_factor,
         );
@@ -60,7 +59,7 @@ impl DlogCommitment {
     }
 
     pub fn verify(&self) -> Result<(), MulEcdsaError> {
-        if HashCommitment::create_commitment_with_user_defined_randomness(
+        if create_hash_commitment(
             &self.open.public_share.bytes_compressed_to_big_int(),
             &self.open.blind_factor,
         ) != self.commitment
@@ -75,7 +74,7 @@ impl DlogCommitment {
         commitment: &BigInt,
         open: &DlogCommitmentOpen,
     ) -> Result<(), MulEcdsaError> {
-        if HashCommitment::create_commitment_with_user_defined_randomness(
+        if create_hash_commitment(
             &open.public_share.bytes_compressed_to_big_int(),
             &open.blind_factor,
         ) != *commitment
@@ -86,23 +85,23 @@ impl DlogCommitment {
         Ok(())
     }
 
-    pub fn get_public_share(&self) -> GE {
+    pub fn get_public_share(&self) -> ProjectivePoint {
         self.open.public_share
     }
 }
 
 impl DLComZK {
     pub fn new(keypair: &EcKeyPair) -> Self {
-        let d_log_proof = DLogProof::<GE>::prove(keypair.get_secret_key());
+        let d_log_proof = DLogProof::<ProjectivePoint>::prove(keypair.get_secret_key());
         // we use hash based commitment
-        let pk_commitment_blind_factor = BigInt::sample(SECURITY_BITS);
-        let pk_commitment = HashCommitment::create_commitment_with_user_defined_randomness(
+        let pk_commitment_blind_factor = sample_bigint(SECURITY_BITS);
+        let pk_commitment = create_hash_commitment(
             &keypair.get_public_key().bytes_compressed_to_big_int(),
             &pk_commitment_blind_factor,
         );
 
-        let zk_pok_blind_factor = BigInt::sample(SECURITY_BITS);
-        let zk_pok_commitment = HashCommitment::create_commitment_with_user_defined_randomness(
+        let zk_pok_blind_factor = sample_bigint(SECURITY_BITS);
+        let zk_pok_commitment = create_hash_commitment(
             &d_log_proof
                 .pk_t_rand_commitment
                 .bytes_compressed_to_big_int(),
@@ -129,7 +128,7 @@ impl DLComZK {
 
     pub fn verify_commitments_and_dlog_proof(&self) -> Result<(), MulEcdsaError> {
         // Verify the commitment of DL
-        if HashCommitment::create_commitment_with_user_defined_randomness(
+        if create_hash_commitment(
             &self.witness.public_share.bytes_compressed_to_big_int(),
             &self.witness.pk_commitment_blind_factor,
         ) != self.commitments.pk_commitment
@@ -138,7 +137,7 @@ impl DLComZK {
         }
 
         // Verify the commitment of proof
-        if HashCommitment::create_commitment_with_user_defined_randomness(
+        if create_hash_commitment(
             &self
                 .witness
                 .d_log_proof
@@ -151,13 +150,13 @@ impl DLComZK {
         }
 
         // Verify DL proof
-        DLogProof::verify(&self.witness.d_log_proof).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
+        self.witness.d_log_proof.verify(&self.witness.public_share).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
         Ok(())
     }
 
     pub fn verify(commitment: &DLCommitments, witness: &CommWitness) -> Result<(), MulEcdsaError> {
         // Verify the commitment of DL
-        if HashCommitment::create_commitment_with_user_defined_randomness(
+        if create_hash_commitment(
             &witness.public_share.bytes_compressed_to_big_int(),
             &witness.pk_commitment_blind_factor,
         ) != commitment.pk_commitment
@@ -166,7 +165,7 @@ impl DLComZK {
         }
 
         // Verify the commitment of proof
-        if HashCommitment::create_commitment_with_user_defined_randomness(
+        if create_hash_commitment(
             &witness
                 .d_log_proof
                 .pk_t_rand_commitment
@@ -178,17 +177,17 @@ impl DLComZK {
         }
 
         // Verify DL proof
-        DLogProof::verify(&witness.d_log_proof).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
+        witness.d_log_proof.verify(&witness.public_share).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
         Ok(())
     }
 
-    pub fn get_public_share(&self) -> GE {
+    pub fn get_public_share(&self) -> ProjectivePoint {
         self.witness.public_share
     }
 }
 
 impl CommWitness {
-    pub fn get_public_key(&self) -> &GE {
+    pub fn get_public_key(&self) -> &ProjectivePoint {
         &self.public_share
     }
 }

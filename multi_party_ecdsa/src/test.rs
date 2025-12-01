@@ -1,13 +1,18 @@
 use super::*;
 use crate::utilities::class_group::*;
 use crate::utilities::clkeypair::ClKeyPair;
-use curv::elliptic::curves::secp256_k1::FE;
-use curv::elliptic::curves::traits::*;
+use k256::Scalar;
+use k256::elliptic_curve::Field;
+use rand::rngs::OsRng;
+use sha2::Digest;
+use k256::ecdsa::{VerifyingKey, signature::Verifier}; 
+use k256::elliptic_curve::sec1::ToEncodedPoint;
+use k256::ecdsa::signature::Signature;
 
 #[test]
 fn mta_test() {
-    let a = FE::new_random();
-    let b = FE::new_random();
+    let a = Scalar::random(&mut OsRng);
+    let b = Scalar::random(&mut OsRng);
     let cl_keypair = ClKeyPair::new(&GROUP_128);
     let mut mta_party_one = mta::PartyOne::new(a);
     let mut mta_party_two = mta::PartyTwo::new(b);
@@ -33,14 +38,15 @@ fn party_two_test() {
         .unwrap();
     let party_one_key = party_one_keygen.generate_key_result();
     let party_two_key = party_two_keygen.generate_key_result();
-    println!("party_one_key = {:?}", party_one_key);
-    println!("party_two_key = {:?}", party_two_key);
+    // println!("party_one_key = {:?}", party_one_key);
+    // println!("party_two_key = {:?}", party_two_key);
 
-    //sign begin
-    let message_str =
-        "eadffe25ea1e8127c2b9aae457d8fdde1040fbbb62e11c281f348f2375dd3f1d".to_string();
-    let mut party_one_sign = party_one::Sign::new(&message_str, false).unwrap();
-    let mut party_two_sign = party_two::Sign::new(&message_str, false).unwrap();
+    // sign begin
+    let message = b"hello world";
+    let message_hash = sha2::Sha256::digest(message).to_vec();
+    
+    let mut party_one_sign = party_one::Sign::new(&message_hash, false).unwrap();
+    let mut party_two_sign = party_two::Sign::new(&message_hash, false).unwrap();
     party_one_sign.keygen_result = Some(party_one_key);
     party_two_sign.keygen_result = Some(party_two_key);
     let party_two_nonce_com = party_two_sign.generate_nonce_com();
@@ -75,6 +81,26 @@ fn party_two_test() {
 
     let s_2 = party_two_sign.online_sign();
 
-    let signature = party_one_sign.online_sign(&s_2);
-    println!("signature = {:?}", signature);
+    let signature = party_one_sign.online_sign(&s_2).unwrap();
+    
+    // Convert our r,s to k256 signature format
+    let r = signature.r.to_bytes().to_vec();
+    let s = signature.s.to_bytes().to_vec();
+    let signature = [r, s].concat();
+
+    println!("Signature (hex): {}", hex::encode(&signature));
+    
+    let k256_sig = k256::ecdsa::Signature::from_bytes(&signature).unwrap();
+    
+    // Get the public key in the right format
+    let public_key_point = party_one_sign.keygen_result.as_ref().unwrap().public_signing_key;
+    let affine = public_key_point.to_affine();
+    let encoded = affine.to_encoded_point(false);
+    let verifying_key = VerifyingKey::from_sec1_bytes(encoded.as_bytes()).unwrap();
+    println!("Public key (hex): {}", hex::encode(encoded.as_bytes()));
+    
+    // Verify signature with k256
+    let k256_verify_result = verifying_key.verify(message, &k256_sig);
+    println!("k256 native verification result: {:?}", k256_verify_result);
 }
+

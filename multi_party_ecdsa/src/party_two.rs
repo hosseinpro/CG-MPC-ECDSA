@@ -6,11 +6,12 @@ use crate::message::*;
 use crate::utilities::dl_com_zk::*;
 use crate::utilities::eckeypair::EcKeyPair;
 use crate::utilities::error::MulEcdsaError;
-use curv::arithmetic::*;
-use curv::cryptographic_primitives::proofs::sigma_dlog::*;
-use curv::elliptic::curves::secp256_k1::{FE, GE};
-use curv::elliptic::curves::traits::*;
-use curv::BigInt;
+use k256::{Scalar, ProjectivePoint};
+use k256::elliptic_curve::Field;
+use crate::utilities::k256_helpers::{serialize_projective_point, deserialize_projective_point, DLogProof};
+use crate::utilities::class_group::scalar_from_bigint;
+use num_bigint::BigInt;
+use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -18,20 +19,23 @@ pub struct KeyGen {
     pub keypair: EcKeyPair,
     pub dl_com_zk_com_rec: DLCommitments,
     pub dl_com_zk_wit_rec: Option<CommWitness>,
-    pub dlog_proof: DLogProof<GE>,
+    pub dlog_proof: DLogProof<ProjectivePoint>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct KeyGenResult {
     pub keypair: EcKeyPair,
-    pub public_signing_key: GE,
-    pub other_public_key: GE,
+    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
+    pub public_signing_key: ProjectivePoint,
+    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
+    pub other_public_key: ProjectivePoint,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct KeyGenSecRoungMsg {
-    pub public_share: GE,
-    pub dl_proof: DLogProof<GE>,
+    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
+    pub public_share: ProjectivePoint,
+    pub dl_proof: DLogProof<ProjectivePoint>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -39,10 +43,10 @@ pub struct Sign {
     pub nonce_pair: EcKeyPair,
     pub dl_com_zk_com: DLComZK,
     pub keygen_result: Option<KeyGenResult>,
-    pub message: FE,
-    pub reshared_secret_share: FE,
-    pub r1_rec: FE,
-    pub r_x: FE,
+    pub message: Scalar,
+    pub reshared_secret_share: Scalar,
+    pub r1_rec: Scalar,
+    pub r_x: Scalar,
     online_offline: bool,
     pub msg_set: bool,
 }
@@ -50,7 +54,7 @@ pub struct Sign {
 impl KeyGen {
     pub fn new() -> Self {
         let keypair = EcKeyPair::new();
-        let dlog_proof = DLogProof::<GE>::prove(&keypair.secret_share);
+        let dlog_proof = DLogProof::<ProjectivePoint>::prove(&keypair.secret_share);
         Self {
             keypair,
             dl_com_zk_com_rec: DLCommitments::default(),
@@ -75,7 +79,7 @@ impl KeyGen {
         dl_com_zk_wit: &CommWitness,
     ) -> Result<(), MulEcdsaError> {
         DLComZK::verify(&self.dl_com_zk_com_rec, dl_com_zk_wit)?;
-        DLogProof::verify(&dl_com_zk_wit.d_log_proof).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
+        DLogProof::verify(&dl_com_zk_wit.d_log_proof, &dl_com_zk_wit.public_share).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
         self.dl_com_zk_wit_rec = Some(dl_com_zk_wit.clone());
         Ok(())
     }
@@ -119,21 +123,20 @@ impl KeyGen {
 }
 
 impl Sign {
-    pub fn new(message_str: &String, online_offline: bool) -> Result<Self, MulEcdsaError> {
+    pub fn new(message_bytes: &[u8], online_offline: bool) -> Result<Self, MulEcdsaError> {
         let nonce_pair = EcKeyPair::new();
         let dl_com_zk_com = DLComZK::new(&nonce_pair);
-        // Process the message to sign
-        let message_bigint =
-            BigInt::from_hex(&message_str).map_err(|_| MulEcdsaError::FromHexFailed)?;
-        let message = ECScalar::from(&message_bigint);
+        // Process the message to sign - convert bytes to BigInt
+        let message_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, message_bytes);
+        let message = scalar_from_bigint(&message_bigint);
         let ret = Self {
             nonce_pair,
             dl_com_zk_com: dl_com_zk_com,
             keygen_result: None,
             message,
-            reshared_secret_share: FE::new_random(),
-            r1_rec: FE::new_random(),
-            r_x: FE::new_random(),
+            reshared_secret_share: Scalar::random(&mut OsRng),
+            r1_rec: Scalar::random(&mut OsRng),
+            r_x: Scalar::random(&mut OsRng),
             online_offline,
             msg_set: false,
         };
@@ -146,21 +149,17 @@ impl Sign {
 
     pub fn verify_generate_mta_consistency(
         &mut self,
-        t_b: FE,
+        t_b: Scalar,
         mta_consis_rec: &MtaConsistencyMsg,
     ) -> Result<(), String> {
-        let base: GE = ECPoint::generator();
-        if base * (t_b + mta_consis_rec.cc)
-            != (mta_consis_rec.reshared_public_share
-                * (mta_consis_rec.r1 + self.nonce_pair.secret_share))
-                .sub_point(
-                    &self
-                        .keygen_result
-                        .as_ref()
-                        .unwrap()
-                        .other_public_key
-                        .get_element(),
-                )
+        if ProjectivePoint::GENERATOR * (t_b + mta_consis_rec.cc)
+            != mta_consis_rec.reshared_public_share
+                * (mta_consis_rec.r1 + self.nonce_pair.secret_share)
+                - self
+                    .keygen_result
+                    .as_ref()
+                    .unwrap()
+                    .other_public_key
         {
             return Err("Verify Mta Consistency Failed".to_string());
         }
@@ -170,8 +169,8 @@ impl Sign {
             .unwrap()
             .keypair
             .secret_share
-            .sub(&t_b.get_element())
-            .sub(&mta_consis_rec.cc.get_element());
+            - t_b
+            - mta_consis_rec.cc;
         self.reshared_secret_share = reshared_secret_share;
         self.r1_rec = mta_consis_rec.r1;
         Ok(())
@@ -181,22 +180,29 @@ impl Sign {
         &mut self,
         nonce_ke_rec: &NonceKEMsg,
     ) -> Result<CommWitness, String> {
-        DLogProof::verify(&nonce_ke_rec.dl_proof).map_err(|_| "Verify DLog failed".to_string())?;
+        DLogProof::verify(&nonce_ke_rec.dl_proof, &nonce_ke_rec.nonce_public_key).map_err(|_| "Verify DLog failed".to_string())?;
         let r = nonce_ke_rec.nonce_public_key * (self.r1_rec + self.nonce_pair.secret_share);
-        self.r_x = ECScalar::from(&r.x_coor().ok_or("get x coor failed")?.mod_floor(&FE::q()));
+        
+        // Get x-coordinate
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
+        let affine = r.to_affine();
+        let encoded = affine.to_encoded_point(false);
+        let x_bytes = encoded.x().ok_or("get x coor failed")?;
+        let x_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, x_bytes);
+        
+        self.r_x = scalar_from_bigint(&x_bigint);
         Ok(self.dl_com_zk_com.witness.clone())
     }
 
-    pub fn online_sign(&self) -> FE {
-        let s_2 = (self.r1_rec + self.nonce_pair.secret_share).invert()
+    pub fn online_sign(&self) -> Scalar {
+        let s_2 = (self.r1_rec + self.nonce_pair.secret_share).invert().unwrap_or(Scalar::ZERO)
             * (self.message + self.r_x * self.reshared_secret_share);
         return s_2;
     }
 
-    pub fn set_msg(&mut self, message_str: String) -> Result<(), MulEcdsaError> {
-        let message_bigint =
-            BigInt::from_hex(&message_str).map_err(|_| MulEcdsaError::FromHexFailed)?;
-        let message: FE = ECScalar::from(&message_bigint);
+    pub fn set_msg(&mut self, message_bytes: &[u8]) -> Result<(), MulEcdsaError> {
+        let message_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, message_bytes);
+        let message: Scalar = scalar_from_bigint(&message_bigint);
         self.message = message;
         self.msg_set = true;
         Ok(())

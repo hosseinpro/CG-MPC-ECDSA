@@ -1,27 +1,27 @@
 use crate::utilities::class_group::*;
 use crate::utilities::error::MulEcdsaError;
 use crate::utilities::SECURITY_PARAMETER;
+use crate::utilities::k256_helpers::ProjectivePointExt;
 use classgroup::gmp::mpz::Mpz;
 use classgroup::gmp_classgroup::*;
 use classgroup::ClassGroup;
-use curv::arithmetic::traits::*;
-use curv::cryptographic_primitives::hashing::hash_sha256::HSha256;
-use curv::cryptographic_primitives::hashing::traits::Hash;
-use curv::elliptic::curves::secp256_k1::{FE, GE};
-use curv::elliptic::curves::traits::*;
-use curv::BigInt;
+use k256::{Scalar, ProjectivePoint};
+use num_bigint::{BigInt, Sign};
+use num_traits::{Zero, One};
+use sha2::{Sha256, Digest};
 use serde::{Deserialize, Serialize};
+use rand::rngs::OsRng;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CLDLState {
     pub cipher: Ciphertext,
     pub cl_pub_key: PK,
-    pub dl_pub: GE,
+    pub dl_pub: ProjectivePoint,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CLDLWit {
-    pub dl_priv: FE,
+    pub dl_priv: Scalar,
     pub r: SK,
 }
 
@@ -29,27 +29,26 @@ pub struct CLDLWit {
 pub struct CLDLProof {
     pub t1: GmpClassGroup,
     pub t2: GmpClassGroup,
-    pub t3: GE,
+    pub t3: ProjectivePoint,
     pub u1: Mpz,
     pub u2: Mpz,
 }
 
 impl CLDLProof {
     pub fn prove(group: &CLGroup, witness: CLDLWit, statement: CLDLState) -> Self {
-        let r1 = BigInt::sample_below(
-            &(&mpz_to_bigint(group.stilde.clone())
-                * BigInt::from(2).pow(40)
-                * BigInt::from(2).pow(SECURITY_PARAMETER as u32)
-                * BigInt::from(2).pow(40)),
-        );
+        let upper = &mpz_to_bigint(group.stilde.clone())
+            * BigInt::from(2i32).pow(40)
+            * BigInt::from(2i32).pow(SECURITY_PARAMETER as u32)
+            * BigInt::from(2i32).pow(40);
+        let r1 = sample_below(&upper);
         let r1_mpz = bigint_to_mpz(r1);
-        let r2_fe: FE = FE::new_random();
+        let r2_fe = Scalar::random(&mut OsRng);
         let r2 = into_mpz(&r2_fe);
         let fr2 = expo_f(&q(), &group.gq.discriminant(), &r2);
         let mut pkr1 = statement.cl_pub_key.0.clone();
         pkr1.pow(r1_mpz.clone());
         let t2 = fr2 * pkr1;
-        let t3 = GE::generator() * r2_fe;
+        let t3 = ProjectivePoint::GENERATOR * r2_fe;
         let mut t1 = group.gq.clone();
         t1.pow(r1_mpz.clone());
         let k = Self::challenge(
@@ -61,10 +60,11 @@ impl CLDLProof {
             &statement.dl_pub,
         );
         let u1 = r1_mpz + &bigint_to_mpz(k.clone()) * &witness.r.0;
-        let u2 = BigInt::mod_add(
+        let q_bigint = mpz_to_bigint(q());
+        let u2 = mod_add(
             &mpz_to_bigint(r2),
-            &(&k * witness.dl_priv.to_big_int()),
-            &FE::q(),
+            &(&k * scalar_to_bigint(&witness.dl_priv)),
+            &q_bigint,
         );
 
         Self {
@@ -81,24 +81,26 @@ impl CLDLProof {
         public_key: &PK,
         t1: GmpClassGroup,
         t2: GmpClassGroup,
-        t3: GE,
+        t3: ProjectivePoint,
         ciphertext: &Ciphertext,
-        x_big: &GE,
+        x_big: &ProjectivePoint,
     ) -> BigInt {
-        let hash256 = HSha256::create_hash(&[
-            // hash the statement i.e. the discrete log of Q is encrypted in (c1,c2) under encryption key h.
-            &x_big.bytes_compressed_to_big_int(),
-            &BigInt::from_bytes(ciphertext.c1.to_bytes().as_ref()),
-            &BigInt::from_bytes(ciphertext.c2.to_bytes().as_ref()),
-            &BigInt::from_bytes(public_key.0.to_bytes().as_ref()),
-            // hash Sigma protocol commitments
-            &BigInt::from_bytes(t1.to_bytes().as_ref()),
-            &BigInt::from_bytes(t2.to_bytes().as_ref()),
-            &t3.bytes_compressed_to_big_int(),
-        ]);
+        let mut hasher = Sha256::new();
+        let x_big_bytes = x_big.bytes_compressed_to_big_int();
+        let (_, x_bytes) = x_big_bytes.to_bytes_be();
+        hasher.update(&x_bytes);
+        hasher.update(ciphertext.c1.to_bytes().as_ref());
+        hasher.update(ciphertext.c2.to_bytes().as_ref());
+        hasher.update(public_key.0.to_bytes().as_ref());
+        hasher.update(t1.to_bytes().as_ref());
+        hasher.update(t2.to_bytes().as_ref());
+        let t3_bytes = t3.bytes_compressed_to_big_int();
+        let (_, t3_be) = t3_bytes.to_bytes_be();
+        hasher.update(&t3_be);
+        let hash256 = hasher.finalize();
 
-        let hash128 = &BigInt::to_bytes(&hash256)[..SECURITY_PARAMETER / 8];
-        BigInt::from_bytes(hash128)
+        let hash128 = &hash256[..SECURITY_PARAMETER / 8];
+        BigInt::from_bytes_be(Sign::Plus, hash128)
     }
 
     pub fn verify(&self, group: &CLGroup, statement: CLDLState) -> Result<(), MulEcdsaError> {
