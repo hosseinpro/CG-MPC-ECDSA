@@ -39,11 +39,13 @@ fn party_two_test() {
     let x2 = secret_key - x1;              // party_two's share
     
     // Create public shares from the secret shares
-    let party_one_public_share = k256::ProjectivePoint::GENERATOR * x1;
-    let party_two_public_share = k256::ProjectivePoint::GENERATOR * x2;
+    let generator = k256::ProjectivePoint::GENERATOR;
+    let party_one_public_share = (generator * x1).to_affine();
+    let party_two_public_share = (generator * x2).to_affine();
     
     // Calculate the combined public key
-    let public_signing_key = party_one_public_share + party_two_public_share;
+    use k256::ProjectivePoint;
+    let public_signing_key = (ProjectivePoint::from(party_one_public_share) + ProjectivePoint::from(party_two_public_share)).to_affine();
     
     // Create KeyGenResult for both parties
     let party_one_key = party_one::KeyGenResult {
@@ -65,6 +67,8 @@ fn party_two_test() {
     let message = b"hello world";
     let message_hash = sha2::Sha256::digest(message).to_vec();
     
+    let start_time = std::time::Instant::now();
+
     let mut party_one_sign = party_one::Sign::new(&message_hash, false).unwrap();
     let mut party_two_sign = party_two::Sign::new(&message_hash, false).unwrap();
     party_one_sign.keygen_result = Some(party_one_key);
@@ -102,6 +106,9 @@ fn party_two_test() {
     let s_2 = party_two_sign.online_sign();
 
     let signature = party_one_sign.online_sign(&s_2).unwrap();
+
+    let elapsed_time = start_time.elapsed();
+    println!("Signing time: {} ms ({} µs)", elapsed_time.as_millis(), elapsed_time.as_micros());
     
     // Convert our r,s to k256 signature format
     let r = signature.r.to_bytes().to_vec();
@@ -114,8 +121,7 @@ fn party_two_test() {
     
     // Get the public key in the right format
     let public_key_point = party_one_sign.keygen_result.as_ref().unwrap().public_signing_key;
-    let affine = public_key_point.to_affine();
-    let encoded = affine.to_encoded_point(false);
+    let encoded = public_key_point.to_encoded_point(false);
     let verifying_key = VerifyingKey::from_sec1_bytes(encoded.as_bytes()).unwrap();
     println!("Public key (hex): {}", hex::encode(encoded.as_bytes()));
     

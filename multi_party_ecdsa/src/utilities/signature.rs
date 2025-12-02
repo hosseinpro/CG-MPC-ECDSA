@@ -16,8 +16,9 @@ impl Signature {
         // secp256k1 order
         let q = BigInt::parse_bytes(b"115792089237316195423570985008687907852837564279074904382605163141518161494337", 10).unwrap();
 
+        let generator = ProjectivePoint::GENERATOR;
         let s_inv = self.s.invert().unwrap_or(Scalar::ZERO);
-        let u1 = ProjectivePoint::GENERATOR * (*message * s_inv);
+        let u1 = generator * (*message * s_inv);
         let u2 = *pubkey * (self.r * s_inv);
 
         // Get x-coordinate of u1 + u2

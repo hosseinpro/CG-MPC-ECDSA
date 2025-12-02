@@ -1,7 +1,7 @@
 use crate::utilities::error::MulEcdsaError;
 use crate::utilities::SECURITY_BITS;
 use crate::utilities::k256_helpers::*;
-use k256::{ProjectivePoint, Scalar};
+use k256::{ProjectivePoint, AffinePoint, Scalar};
 use num_bigint::BigInt;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
@@ -15,8 +15,7 @@ pub struct DlogCommitment {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DlogCommitmentOpen {
     pub blind_factor: BigInt,
-    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
-    pub public_share: ProjectivePoint,
+    pub public_share: AffinePoint,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -35,9 +34,8 @@ pub struct DLCommitments {
 pub struct CommWitness {
     pub pk_commitment_blind_factor: BigInt,
     pub zk_pok_blind_factor: BigInt,
-    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
-    pub public_share: ProjectivePoint,
-    pub d_log_proof: DLogProof<ProjectivePoint>,
+    pub public_share: AffinePoint,
+    pub d_log_proof: DLogProof<AffinePoint>,
 }
 
 impl DlogCommitment {
@@ -52,7 +50,7 @@ impl DlogCommitment {
             commitment,
             open: DlogCommitmentOpen {
                 blind_factor,
-                public_share: public_share.clone(),
+                public_share: public_share.to_affine(),
             },
         }
     }
@@ -84,14 +82,14 @@ impl DlogCommitment {
         Ok(())
     }
 
-    pub fn get_public_share(&self) -> ProjectivePoint {
+    pub fn get_public_share(&self) -> AffinePoint {
         self.open.public_share
     }
 }
 
 impl DLComZK {
     pub fn new(secret_share: &Scalar, public_share: &ProjectivePoint) -> Self {
-        let d_log_proof = DLogProof::<ProjectivePoint>::prove(secret_share);
+        let d_log_proof = DLogProof::<AffinePoint>::prove(secret_share);
         // we use hash based commitment
         let pk_commitment_blind_factor = sample_bigint(SECURITY_BITS);
         let pk_commitment = create_hash_commitment(
@@ -102,8 +100,7 @@ impl DLComZK {
         let zk_pok_blind_factor = sample_bigint(SECURITY_BITS);
         let zk_pok_commitment = create_hash_commitment(
             &d_log_proof
-                .pk_t_rand_commitment
-                .bytes_compressed_to_big_int(),
+                .pk_t_rand_commitment.bytes_compressed_to_big_int(),
             &zk_pok_blind_factor,
         );
 
@@ -115,7 +112,7 @@ impl DLComZK {
         let witness = CommWitness {
             pk_commitment_blind_factor,
             zk_pok_blind_factor,
-            public_share: public_share.clone(),
+            public_share: public_share.to_affine(),
             d_log_proof,
         };
 
@@ -140,8 +137,7 @@ impl DLComZK {
             &self
                 .witness
                 .d_log_proof
-                .pk_t_rand_commitment
-                .bytes_compressed_to_big_int(),
+                .pk_t_rand_commitment.bytes_compressed_to_big_int(),
             &self.witness.zk_pok_blind_factor,
         ) != self.commitments.zk_pok_commitment
         {
@@ -149,7 +145,7 @@ impl DLComZK {
         }
 
         // Verify DL proof
-        self.witness.d_log_proof.verify(&self.witness.public_share).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
+        self.witness.d_log_proof.verify(&ProjectivePoint::from(self.witness.public_share)).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
         Ok(())
     }
 
@@ -167,8 +163,7 @@ impl DLComZK {
         if create_hash_commitment(
             &witness
                 .d_log_proof
-                .pk_t_rand_commitment
-                .bytes_compressed_to_big_int(),
+                .pk_t_rand_commitment.bytes_compressed_to_big_int(),
             &witness.zk_pok_blind_factor,
         ) != commitment.zk_pok_commitment
         {
@@ -176,17 +171,17 @@ impl DLComZK {
         }
 
         // Verify DL proof
-        witness.d_log_proof.verify(&witness.public_share).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
+        witness.d_log_proof.verify(&ProjectivePoint::from(witness.public_share)).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
         Ok(())
     }
 
-    pub fn get_public_share(&self) -> ProjectivePoint {
+    pub fn get_public_share(&self) -> AffinePoint {
         self.witness.public_share
     }
 }
 
 impl CommWitness {
-    pub fn get_public_key(&self) -> &ProjectivePoint {
+    pub fn get_public_key(&self) -> &AffinePoint {
         &self.public_share
     }
 }
@@ -205,8 +200,9 @@ fn dl_com_zk_test() {
     use k256::elliptic_curve::Field;
     use rand::rngs::OsRng;
     
+    let generator = ProjectivePoint::GENERATOR;
     let secret_share = Scalar::random(&mut OsRng);
-    let public_share = ProjectivePoint::GENERATOR * secret_share;
+    let public_share = generator * secret_share;
 
     let dl_com_zk = DLComZK::new(&secret_share, &public_share);
 
