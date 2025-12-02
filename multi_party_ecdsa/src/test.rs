@@ -108,7 +108,7 @@ fn party_two_test() {
     let signature = party_one_sign.online_sign(&s_2).unwrap();
 
     let elapsed_time = start_time.elapsed();
-    println!("Signing time: {} ms ({} µs)", elapsed_time.as_millis(), elapsed_time.as_micros());
+    println!("Signing time: {} ms", elapsed_time.as_millis());
     
     // Convert our r,s to k256 signature format
     let r = signature.r.to_bytes().to_vec();
