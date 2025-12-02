@@ -1,10 +1,9 @@
 use crate::utilities::dl_com_zk::*;
-use crate::utilities::eckeypair::EcKeyPair;
 use crate::utilities::signature::*;
 use crate::utilities::error::MulEcdsaError;
 use k256::{Scalar, ProjectivePoint};
 use k256::elliptic_curve::Field;
-use crate::utilities::k256_helpers::{serialize_projective_point, deserialize_projective_point, DLogProof};
+use crate::utilities::k256_helpers::{serialize_projective_point, deserialize_projective_point, DLogProof, serialize_scalar, deserialize_scalar};
 use crate::utilities::class_group::{scalar_to_bigint, scalar_from_bigint};
 use num_bigint::BigInt;
 use rand::rngs::OsRng;
@@ -13,7 +12,10 @@ use std::cmp;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct KeyGenResult {
-    pub keypair: EcKeyPair,
+    #[serde(serialize_with = "serialize_scalar", deserialize_with = "deserialize_scalar")]
+    pub secret_share: Scalar,
+    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
+    pub public_share: ProjectivePoint,
     #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
     pub public_signing_key: ProjectivePoint,
 }
@@ -21,9 +23,15 @@ pub struct KeyGenResult {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Sign {
     pub dl_com_zk_com_rec: DLCommitments,
-    pub reshared_keypair: EcKeyPair,
+    #[serde(serialize_with = "serialize_scalar", deserialize_with = "deserialize_scalar")]
+    pub reshared_secret_share: Scalar,
+    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
+    pub reshared_public_share: ProjectivePoint,
     pub keygen_result: Option<KeyGenResult>,
-    pub nonce_pair: EcKeyPair,
+    #[serde(serialize_with = "serialize_scalar", deserialize_with = "deserialize_scalar")]
+    pub nonce_secret_share: Scalar,
+    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
+    pub nonce_public_share: ProjectivePoint,
     pub r1: Scalar,
     pub r_x: Scalar,
     pub message: Scalar,
@@ -48,17 +56,24 @@ pub struct NonceKEMsg {
 
 impl Sign {
     pub fn new(message_bytes: &[u8], online_offline: bool) -> Result<Self, MulEcdsaError> {
-        let reshared_keypair: EcKeyPair = EcKeyPair::new();
+        let reshared_secret_share = Scalar::random(&mut OsRng);
+        let reshared_public_share = ProjectivePoint::GENERATOR * reshared_secret_share;
+        
         // Process the message to sign - convert bytes to BigInt
         let message_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, message_bytes);
         let message = scalar_from_bigint(&message_bigint);
-        let nonce_pair = EcKeyPair::new();
-        let dl_proof = DLogProof::<ProjectivePoint>::prove(&nonce_pair.secret_share);
+        
+        let nonce_secret_share = Scalar::random(&mut OsRng);
+        let nonce_public_share = ProjectivePoint::GENERATOR * nonce_secret_share;
+        let dl_proof = DLogProof::<ProjectivePoint>::prove(&nonce_secret_share);
+        
         let ret = Self {
             dl_com_zk_com_rec: DLCommitments::default(),
-            reshared_keypair,
+            reshared_secret_share,
+            reshared_public_share,
             keygen_result: None,
-            nonce_pair,
+            nonce_secret_share,
+            nonce_public_share,
             r1: Scalar::random(&mut OsRng),
             r_x: Scalar::random(&mut OsRng),
             message,
@@ -74,15 +89,14 @@ impl Sign {
 
     pub fn generate_mta_consistency(&self, t_a: Scalar) -> MtaConsistencyMsg {
         let cc: Scalar = t_a
-            + self.reshared_keypair.secret_share * self.r1
+            + self.reshared_secret_share * self.r1
             - self
                 .keygen_result
                 .clone()
                 .unwrap()
-                .keypair
                 .secret_share;
         MtaConsistencyMsg {
-            reshared_public_share: self.reshared_keypair.public_share,
+            reshared_public_share: self.reshared_public_share,
             r1: self.r1,
             cc,
         }
@@ -90,7 +104,7 @@ impl Sign {
 
     pub fn generate_nonce_ke_msg(&mut self) -> NonceKEMsg {
         NonceKEMsg {
-            nonce_public_key: self.nonce_pair.public_share,
+            nonce_public_key: self.nonce_public_share,
             dl_proof: self.dl_proof.clone(),
         }
     }
@@ -99,8 +113,8 @@ impl Sign {
         DLComZK::verify(&self.dl_com_zk_com_rec, nonce_ke_rec)?;
         DLogProof::verify(&nonce_ke_rec.d_log_proof, &nonce_ke_rec.public_share).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
         
-        let r = nonce_ke_rec.public_share * self.nonce_pair.secret_share
-            + ProjectivePoint::GENERATOR * (self.nonce_pair.secret_share * self.r1);
+        let r = nonce_ke_rec.public_share * self.nonce_secret_share
+            + ProjectivePoint::GENERATOR * (self.nonce_secret_share * self.r1);
         
         // Get x-coordinate
         use k256::elliptic_curve::sec1::ToEncodedPoint;
@@ -114,8 +128,8 @@ impl Sign {
     }
 
     pub fn online_sign(&self, s2_rec: &Scalar) -> Result<Signature, MulEcdsaError> {
-        let s_tag = self.nonce_pair.secret_share.invert().unwrap_or(Scalar::ZERO)
-            * (*s2_rec + self.r_x * self.reshared_keypair.secret_share);
+        let s_tag = self.nonce_secret_share.invert().unwrap_or(Scalar::ZERO)
+            * (*s2_rec + self.r_x * self.reshared_secret_share);
         
         // secp256k1 order
         let q = BigInt::parse_bytes(b"115792089237316195423570985008687907852837564279074904382605163141518161494337", 10).unwrap();

@@ -38,23 +38,25 @@ fn party_two_test() {
     let x1 = Scalar::random(&mut OsRng);  // party_one's share
     let x2 = secret_key - x1;              // party_two's share
     
-    // Create keypairs from the shares
-    let party_one_keypair = crate::utilities::eckeypair::EcKeyPair::from_sk(x1);
-    let party_two_keypair = crate::utilities::eckeypair::EcKeyPair::from_sk(x2);
+    // Create public shares from the secret shares
+    let party_one_public_share = k256::ProjectivePoint::GENERATOR * x1;
+    let party_two_public_share = k256::ProjectivePoint::GENERATOR * x2;
     
     // Calculate the combined public key
-    let public_signing_key = party_one_keypair.public_share + party_two_keypair.public_share;
+    let public_signing_key = party_one_public_share + party_two_public_share;
     
     // Create KeyGenResult for both parties
     let party_one_key = party_one::KeyGenResult {
-        keypair: party_one_keypair.clone(),
+        secret_share: x1,
+        public_share: party_one_public_share,
         public_signing_key,
     };
     
     let party_two_key = party_two::KeyGenResult {
-        keypair: party_two_keypair.clone(),
+        secret_share: x2,
+        public_share: party_two_public_share,
         public_signing_key,
-        other_public_key: party_one_keypair.public_share,
+        other_public_key: party_one_public_share,
     };
     // println!("party_one_key = {:?}", party_one_key);
     // println!("party_two_key = {:?}", party_two_key);
@@ -73,8 +75,8 @@ fn party_two_test() {
     //mta begin;
     let cl_keypair = ClKeyPair::new(&GROUP_128);
     let mut mta_party_one =
-        mta::PartyOne::new(party_one_sign.reshared_keypair.secret_share);
-    let mut mta_party_two = mta::PartyTwo::new(party_two_sign.nonce_pair.secret_share);
+        mta::PartyOne::new(party_one_sign.reshared_secret_share);
+    let mut mta_party_two = mta::PartyTwo::new(party_two_sign.nonce_secret_share);
 
     let mta_first_round_msg = mta_party_one.generate_send_msg(&cl_keypair.cl_pub_key);
     let mta_second_round_msg = mta_party_two

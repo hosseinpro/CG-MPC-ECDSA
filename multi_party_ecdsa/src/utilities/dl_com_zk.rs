@@ -1,8 +1,7 @@
-use crate::utilities::eckeypair::EcKeyPair;
 use crate::utilities::error::MulEcdsaError;
 use crate::utilities::SECURITY_BITS;
 use crate::utilities::k256_helpers::*;
-use k256::ProjectivePoint;
+use k256::{ProjectivePoint, Scalar};
 use num_bigint::BigInt;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
@@ -91,12 +90,12 @@ impl DlogCommitment {
 }
 
 impl DLComZK {
-    pub fn new(keypair: &EcKeyPair) -> Self {
-        let d_log_proof = DLogProof::<ProjectivePoint>::prove(keypair.get_secret_key());
+    pub fn new(secret_share: &Scalar, public_share: &ProjectivePoint) -> Self {
+        let d_log_proof = DLogProof::<ProjectivePoint>::prove(secret_share);
         // we use hash based commitment
         let pk_commitment_blind_factor = sample_bigint(SECURITY_BITS);
         let pk_commitment = create_hash_commitment(
-            &keypair.get_public_key().bytes_compressed_to_big_int(),
+            &public_share.bytes_compressed_to_big_int(),
             &pk_commitment_blind_factor,
         );
 
@@ -116,7 +115,7 @@ impl DLComZK {
         let witness = CommWitness {
             pk_commitment_blind_factor,
             zk_pok_blind_factor,
-            public_share: keypair.get_public_key().clone(),
+            public_share: public_share.clone(),
             d_log_proof,
         };
 
@@ -203,9 +202,13 @@ impl Default for DLCommitments {
 
 #[test]
 fn dl_com_zk_test() {
-    let keypair = EcKeyPair::new();
+    use k256::elliptic_curve::Field;
+    use rand::rngs::OsRng;
+    
+    let secret_share = Scalar::random(&mut OsRng);
+    let public_share = ProjectivePoint::GENERATOR * secret_share;
 
-    let dl_com_zk = DLComZK::new(&keypair);
+    let dl_com_zk = DLComZK::new(&secret_share, &public_share);
 
     dl_com_zk.verify_commitments_and_dlog_proof().unwrap();
 }

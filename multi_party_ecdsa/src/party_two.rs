@@ -1,10 +1,9 @@
 use crate::party_one::{MtaConsistencyMsg, NonceKEMsg};
 use crate::utilities::dl_com_zk::*;
-use crate::utilities::eckeypair::EcKeyPair;
 use crate::utilities::error::MulEcdsaError;
 use k256::{Scalar, ProjectivePoint};
 use k256::elliptic_curve::Field;
-use crate::utilities::k256_helpers::{serialize_projective_point, deserialize_projective_point, DLogProof};
+use crate::utilities::k256_helpers::{serialize_projective_point, deserialize_projective_point, DLogProof, serialize_scalar, deserialize_scalar};
 use crate::utilities::class_group::scalar_from_bigint;
 use num_bigint::BigInt;
 use rand::rngs::OsRng;
@@ -12,7 +11,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct KeyGenResult {
-    pub keypair: EcKeyPair,
+    #[serde(serialize_with = "serialize_scalar", deserialize_with = "deserialize_scalar")]
+    pub secret_share: Scalar,
+    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
+    pub public_share: ProjectivePoint,
     #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
     pub public_signing_key: ProjectivePoint,
     #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
@@ -22,7 +24,10 @@ pub struct KeyGenResult {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Sign {
-    pub nonce_pair: EcKeyPair,
+    #[serde(serialize_with = "serialize_scalar", deserialize_with = "deserialize_scalar")]
+    pub nonce_secret_share: Scalar,
+    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
+    pub nonce_public_share: ProjectivePoint,
     pub dl_com_zk_com: DLComZK,
     pub keygen_result: Option<KeyGenResult>,
     pub message: Scalar,
@@ -35,13 +40,16 @@ pub struct Sign {
 
 impl Sign {
     pub fn new(message_bytes: &[u8], online_offline: bool) -> Result<Self, MulEcdsaError> {
-        let nonce_pair = EcKeyPair::new();
-        let dl_com_zk_com = DLComZK::new(&nonce_pair);
+        let nonce_secret_share = Scalar::random(&mut OsRng);
+        let nonce_public_share = ProjectivePoint::GENERATOR * nonce_secret_share;
+        let dl_com_zk_com = DLComZK::new(&nonce_secret_share, &nonce_public_share);
+        
         // Process the message to sign - convert bytes to BigInt
         let message_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, message_bytes);
         let message = scalar_from_bigint(&message_bigint);
         let ret = Self {
-            nonce_pair,
+            nonce_secret_share,
+            nonce_public_share,
             dl_com_zk_com: dl_com_zk_com,
             keygen_result: None,
             message,
@@ -65,7 +73,7 @@ impl Sign {
     ) -> Result<(), String> {
         if ProjectivePoint::GENERATOR * (t_b + mta_consis_rec.cc)
             != mta_consis_rec.reshared_public_share
-                * (mta_consis_rec.r1 + self.nonce_pair.secret_share)
+                * (mta_consis_rec.r1 + self.nonce_secret_share)
                 - self
                     .keygen_result
                     .as_ref()
@@ -78,7 +86,6 @@ impl Sign {
             .keygen_result
             .as_ref()
             .unwrap()
-            .keypair
             .secret_share
             - t_b
             - mta_consis_rec.cc;
@@ -92,7 +99,7 @@ impl Sign {
         nonce_ke_rec: &NonceKEMsg,
     ) -> Result<CommWitness, String> {
         DLogProof::verify(&nonce_ke_rec.dl_proof, &nonce_ke_rec.nonce_public_key).map_err(|_| "Verify DLog failed".to_string())?;
-        let r = nonce_ke_rec.nonce_public_key * (self.r1_rec + self.nonce_pair.secret_share);
+        let r = nonce_ke_rec.nonce_public_key * (self.r1_rec + self.nonce_secret_share);
         
         // Get x-coordinate
         use k256::elliptic_curve::sec1::ToEncodedPoint;
@@ -106,7 +113,7 @@ impl Sign {
     }
 
     pub fn online_sign(&self) -> Scalar {
-        let s_2 = (self.r1_rec + self.nonce_pair.secret_share).invert().unwrap_or(Scalar::ZERO)
+        let s_2 = (self.r1_rec + self.nonce_secret_share).invert().unwrap_or(Scalar::ZERO)
             * (self.message + self.r_x * self.reshared_secret_share);
         return s_2;
     }

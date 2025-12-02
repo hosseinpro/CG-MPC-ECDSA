@@ -7,6 +7,34 @@ use serde::{Deserialize, Serialize, Deserializer, Serializer};
 use serde::de::Error as DeError;
 use rand::rngs::OsRng;
 
+// Serialization helpers for Scalar
+pub fn serialize_scalar<S>(scalar: &Scalar, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let bytes = scalar.to_bytes();
+    serializer.serialize_bytes(&bytes)
+}
+
+pub fn deserialize_scalar<'de, D>(deserializer: D) -> Result<Scalar, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let bytes: Vec<u8> = Deserialize::deserialize(deserializer)?;
+    if bytes.len() != 32 {
+        return Err(DeError::custom("Invalid scalar length"));
+    }
+    let mut array = [0u8; 32];
+    array.copy_from_slice(&bytes);
+    let ct_option = Scalar::from_repr(array.into());
+    let scalar = if ct_option.is_some().into() {
+        ct_option.unwrap()
+    } else {
+        return Err(DeError::custom("Invalid scalar"));
+    };
+    Ok(scalar)
+}
+
 // Serialization helpers for ProjectivePoint
 pub fn serialize_projective_point<S>(point: &ProjectivePoint, serializer: S) -> Result<S::Ok, S::Error>
 where
