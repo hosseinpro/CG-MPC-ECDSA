@@ -39,7 +39,7 @@ fn party_two_test() {
     let x2 = secret_key - x1;              // party_two's share
     
     // Create public shares from the secret shares
-    let party_one_public_share = k256::ProjectivePoint::GENERATOR * x1;
+   let party_one_public_share = k256::ProjectivePoint::GENERATOR * x1;
     let party_two_public_share = k256::ProjectivePoint::GENERATOR * x2;
     
     // Calculate the combined public key
@@ -65,6 +65,8 @@ fn party_two_test() {
     let message = b"hello world";
     let message_hash = sha2::Sha256::digest(message).to_vec();
     
+    let start_time = std::time::Instant::now();
+
     let mut party_one_sign = party_one::Sign::new(&message_hash, false).unwrap();
     let mut party_two_sign = party_two::Sign::new(&message_hash, false).unwrap();
     party_one_sign.keygen_result = Some(party_one_key);
@@ -102,6 +104,9 @@ fn party_two_test() {
     let s_2 = party_two_sign.online_sign();
 
     let signature = party_one_sign.online_sign(&s_2).unwrap();
+
+    let elapsed_time = start_time.elapsed();
+    println!("Signing time: {} ms ({} µs)", elapsed_time.as_millis(), elapsed_time.as_micros());
     
     // Convert our r,s to k256 signature format
     let r = signature.r.to_bytes().to_vec();
