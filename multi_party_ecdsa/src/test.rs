@@ -3,6 +3,7 @@ use crate::utilities::class_group::*;
 use crate::utilities::clkeypair::ClKeyPair;
 use k256::Scalar;
 use k256::elliptic_curve::Field;
+use k256::elliptic_curve::PrimeField;
 use rand::rngs::OsRng;
 use sha2::Digest;
 use k256::ecdsa::{VerifyingKey, signature::Verifier}; 
@@ -25,19 +26,36 @@ fn mta_test() {
 }
 #[test]
 fn party_two_test() {
-    //keygen bigin
-    let mut party_one_keygen = party_one::KeyGen::new();
-    let mut party_two_keygen = party_two::KeyGen::new();
-    let party_one_first_round = party_one_keygen.generate_first_round_msg();
-    let party_two_sec_round =
-        party_two_keygen.get_msg_and_generate_second_round_msg(&party_one_first_round);
-    let party_one_third_round =
-        party_one_keygen.get_msg_and_generate_third_roung_msg(&party_two_sec_round);
-    party_two_keygen
-        .verify_third_roung_msg(&party_one_third_round.unwrap())
-        .unwrap();
-    let party_one_key = party_one_keygen.generate_key_result();
-    let party_two_key = party_two_keygen.generate_key_result();
+    // Import secret key
+    let secret_key_bytes = hex::decode("1e99423a4edf5c3d3f8b1c0e8f7f4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5").unwrap();
+    
+    // Convert bytes to Scalar
+    let mut sk_array = [0u8; 32];
+    sk_array.copy_from_slice(&secret_key_bytes);
+    let secret_key = Scalar::from_repr(sk_array.into()).unwrap();
+    
+    // Split secret key into two shares: x1 and x2 where x1 + x2 = secret_key
+    let x1 = Scalar::random(&mut OsRng);  // party_one's share
+    let x2 = secret_key - x1;              // party_two's share
+    
+    // Create keypairs from the shares
+    let party_one_keypair = crate::utilities::eckeypair::EcKeyPair::from_sk(x1);
+    let party_two_keypair = crate::utilities::eckeypair::EcKeyPair::from_sk(x2);
+    
+    // Calculate the combined public key
+    let public_signing_key = party_one_keypair.public_share + party_two_keypair.public_share;
+    
+    // Create KeyGenResult for both parties
+    let party_one_key = party_one::KeyGenResult {
+        keypair: party_one_keypair.clone(),
+        public_signing_key,
+    };
+    
+    let party_two_key = party_two::KeyGenResult {
+        keypair: party_two_keypair.clone(),
+        public_signing_key,
+        other_public_key: party_one_keypair.public_share,
+    };
     // println!("party_one_key = {:?}", party_one_key);
     // println!("party_two_key = {:?}", party_two_key);
 

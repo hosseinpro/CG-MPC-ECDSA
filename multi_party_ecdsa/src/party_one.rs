@@ -1,4 +1,3 @@
-use crate::party_two::KeyGenSecRoungMsg;
 use crate::utilities::dl_com_zk::*;
 use crate::utilities::eckeypair::EcKeyPair;
 use crate::utilities::signature::*;
@@ -11,15 +10,6 @@ use num_bigint::BigInt;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::cmp;
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct KeyGen {
-    pub keypair: EcKeyPair,
-    pub dl_com_zk_com: DLCommitments,
-    pub dl_com_zk_wit: CommWitness,
-    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
-    pub public_share_rec: ProjectivePoint,
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct KeyGenResult {
@@ -56,42 +46,6 @@ pub struct NonceKEMsg {
     pub dl_proof: DLogProof<ProjectivePoint>,
 }
 
-impl KeyGen {
-    pub fn new() -> Self {
-        let keypair = EcKeyPair::new();
-        let dl_com_zk = DLComZK::new(&keypair);
-        // Generate a random projective point
-        let random_scalar = Scalar::random(&mut OsRng);
-        let public_share_rec = ProjectivePoint::GENERATOR * random_scalar;
-        Self {
-            keypair,
-            dl_com_zk_com: dl_com_zk.commitments,
-            dl_com_zk_wit: dl_com_zk.witness,
-            public_share_rec,
-        }
-    }
-
-    pub fn generate_first_round_msg(&self) -> DLCommitments {
-        self.dl_com_zk_com.clone()
-    }
-
-    pub fn get_msg_and_generate_third_roung_msg(
-        &mut self,
-        received_msg: &KeyGenSecRoungMsg,
-    ) -> Result<CommWitness, MulEcdsaError> {
-        DLogProof::verify(&received_msg.dl_proof, &received_msg.public_share).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
-        self.public_share_rec = received_msg.public_share;
-        Ok(self.dl_com_zk_wit.clone())
-    }
-
-    pub fn generate_key_result(&self) -> KeyGenResult {
-        KeyGenResult {
-            keypair: self.keypair.clone(),
-            public_signing_key: self.public_share_rec + self.keypair.public_share,
-        }
-    }
-}
-
 impl Sign {
     pub fn new(message_bytes: &[u8], online_offline: bool) -> Result<Self, MulEcdsaError> {
         let reshared_keypair: EcKeyPair = EcKeyPair::new();
@@ -112,13 +66,6 @@ impl Sign {
             online_offline,
         };
         Ok(ret)
-    }
-
-    pub fn load_keygen_result(&mut self, keygen_json: &String) -> Result<(), MulEcdsaError> {
-        // Load keygen result
-        let keygen_result = KeyGenResult::from_json_string(keygen_json)?;
-        self.keygen_result = Some(keygen_result);
-        Ok(())
     }
 
     pub fn get_nonce_com(&mut self, dl_com_zk_com_rec: &DLCommitments) {
@@ -184,12 +131,5 @@ impl Sign {
             &self.message,
         )?;
         return Ok(signature);
-    }
-}
-
-impl KeyGenResult {
-    pub fn from_json_string(json_string: &String) -> Result<Self, MulEcdsaError> {
-        let ret = serde_json::from_str(json_string).map_err(|_| MulEcdsaError::FromStringFailed)?;
-        Ok(ret)
     }
 }

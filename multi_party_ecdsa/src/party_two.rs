@@ -11,14 +11,6 @@ use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct KeyGen {
-    pub keypair: EcKeyPair,
-    pub dl_com_zk_com_rec: DLCommitments,
-    pub dl_com_zk_wit_rec: Option<CommWitness>,
-    pub dlog_proof: DLogProof<ProjectivePoint>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct KeyGenResult {
     pub keypair: EcKeyPair,
     #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
@@ -27,12 +19,6 @@ pub struct KeyGenResult {
     pub other_public_key: ProjectivePoint,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct KeyGenSecRoungMsg {
-    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
-    pub public_share: ProjectivePoint,
-    pub dl_proof: DLogProof<ProjectivePoint>,
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Sign {
@@ -45,49 +31,6 @@ pub struct Sign {
     pub r_x: Scalar,
     online_offline: bool,
     pub msg_set: bool,
-}
-
-impl KeyGen {
-    pub fn new() -> Self {
-        let keypair = EcKeyPair::new();
-        let dlog_proof = DLogProof::<ProjectivePoint>::prove(&keypair.secret_share);
-        Self {
-            keypair,
-            dl_com_zk_com_rec: DLCommitments::default(),
-            dl_com_zk_wit_rec: None,
-            dlog_proof,
-        }
-    }
-
-    pub fn get_msg_and_generate_second_round_msg(
-        &mut self,
-        dl_com_zk_com_rec: &DLCommitments,
-    ) -> KeyGenSecRoungMsg {
-        self.dl_com_zk_com_rec = (*dl_com_zk_com_rec).clone();
-        KeyGenSecRoungMsg {
-            public_share: self.keypair.public_share,
-            dl_proof: self.dlog_proof.clone(),
-        }
-    }
-
-    pub fn verify_third_roung_msg(
-        &mut self,
-        dl_com_zk_wit: &CommWitness,
-    ) -> Result<(), MulEcdsaError> {
-        DLComZK::verify(&self.dl_com_zk_com_rec, dl_com_zk_wit)?;
-        DLogProof::verify(&dl_com_zk_wit.d_log_proof, &dl_com_zk_wit.public_share).map_err(|_| MulEcdsaError::VrfyDlogFailed)?;
-        self.dl_com_zk_wit_rec = Some(dl_com_zk_wit.clone());
-        Ok(())
-    }
-
-    pub fn generate_key_result(&self) -> KeyGenResult {
-        KeyGenResult {
-            keypair: self.keypair.clone(),
-            public_signing_key: self.keypair.public_share
-                + self.dl_com_zk_wit_rec.clone().unwrap().public_share,
-            other_public_key: self.dl_com_zk_wit_rec.clone().unwrap().public_share,
-        }
-    }
 }
 
 impl Sign {
@@ -174,19 +117,5 @@ impl Sign {
         self.message = message;
         self.msg_set = true;
         Ok(())
-    }
-
-    pub fn load_keygen_result(&mut self, keygen_json: &String) -> Result<(), MulEcdsaError> {
-        // Load keygen result
-        let keygen_result = KeyGenResult::from_json_string(keygen_json)?;
-        self.keygen_result = Some(keygen_result);
-        Ok(())
-    }
-}
-
-impl KeyGenResult {
-    pub fn from_json_string(json_string: &String) -> Result<Self, MulEcdsaError> {
-        let ret = serde_json::from_str(json_string).map_err(|_| MulEcdsaError::FromStringFailed)?;
-        Ok(ret)
     }
 }
