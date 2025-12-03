@@ -1,32 +1,25 @@
 use crate::party_one::{MtaConsistencyMsg, NonceKEMsg};
 use crate::utilities::dl_com_zk::*;
 use crate::utilities::error::MulEcdsaError;
+use crate::utilities::k256_helpers::DLogProof;
 use k256::{Scalar, ProjectivePoint};
 use k256::elliptic_curve::Field;
-use crate::utilities::k256_helpers::{serialize_projective_point, deserialize_projective_point, DLogProof, serialize_scalar, deserialize_scalar};
 use crate::utilities::class_group::scalar_from_bigint;
 use num_bigint::BigInt;
 use rand::rngs::OsRng;
-use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct KeyGenResult {
-    #[serde(serialize_with = "serialize_scalar", deserialize_with = "deserialize_scalar")]
     pub secret_share: Scalar,
-    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
     pub public_share: ProjectivePoint,
-    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
     pub public_signing_key: ProjectivePoint,
-    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
     pub other_public_key: ProjectivePoint,
 }
 
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Sign {
-    #[serde(serialize_with = "serialize_scalar", deserialize_with = "deserialize_scalar")]
     pub nonce_secret_share: Scalar,
-    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
     pub nonce_public_share: ProjectivePoint,
     pub dl_com_zk_com: DLComZK,
     pub keygen_result: Option<KeyGenResult>,

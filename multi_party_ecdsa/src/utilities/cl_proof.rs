@@ -9,22 +9,21 @@ use k256::elliptic_curve::Field;
 use num_bigint::{BigInt, Sign};
 use num_traits::One;
 use sha2::{Sha256, Digest};
-use serde::{Deserialize, Serialize};
 use rand::rngs::OsRng;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CLState {
     pub cipher: Ciphertext,
     pub cl_pub_key: PK,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CLWit {
     pub x: Scalar,
     pub r: SK,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CLProof {
     pub t1: GmpClassGroup,
     pub t2: GmpClassGroup,

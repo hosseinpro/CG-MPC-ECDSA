@@ -9,23 +9,22 @@ use k256::{Scalar, ProjectivePoint};
 use num_bigint::{BigInt, Sign};
 use num_traits::{Zero, One};
 use sha2::{Sha256, Digest};
-use serde::{Deserialize, Serialize};
 use rand::rngs::OsRng;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CLDLState {
     pub cipher: Ciphertext,
     pub cl_pub_key: PK,
     pub dl_pub: ProjectivePoint,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CLDLWit {
     pub dl_priv: Scalar,
     pub r: SK,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CLDLProof {
     pub t1: GmpClassGroup,
     pub t2: GmpClassGroup,

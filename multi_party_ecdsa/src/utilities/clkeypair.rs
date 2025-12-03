@@ -1,11 +1,7 @@
-//use class_group::primitives::cl_dl_public_setup::{CLGroup, PK, SK};
 use crate::utilities::class_group::*;
 use classgroup::ClassGroup;
-// use curv::elliptic::curves::secp256_k1::FE;
-// use curv::elliptic::curves::traits::*;
-use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct ClKeyPair {
     pub cl_pub_key: PK,
     pub cl_priv_key: SK,

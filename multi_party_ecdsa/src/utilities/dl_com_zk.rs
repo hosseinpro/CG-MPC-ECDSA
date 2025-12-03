@@ -4,38 +4,35 @@ use crate::utilities::k256_helpers::*;
 use k256::{ProjectivePoint, Scalar};
 use num_bigint::BigInt;
 use num_traits::Zero;
-use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct DlogCommitment {
     pub commitment: BigInt,
     pub open: DlogCommitmentOpen,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct DlogCommitmentOpen {
     pub blind_factor: BigInt,
-    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
     pub public_share: ProjectivePoint,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct DLComZK {
     pub commitments: DLCommitments,
     pub witness: CommWitness,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct DLCommitments {
     pub pk_commitment: BigInt,
     pub zk_pok_commitment: BigInt,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CommWitness {
     pub pk_commitment_blind_factor: BigInt,
     pub zk_pok_blind_factor: BigInt,
-    #[serde(serialize_with = "serialize_projective_point", deserialize_with = "deserialize_projective_point")]
     pub public_share: ProjectivePoint,
     pub d_log_proof: DLogProof<ProjectivePoint>,
 }

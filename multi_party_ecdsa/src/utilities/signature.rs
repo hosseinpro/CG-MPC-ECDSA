@@ -3,9 +3,8 @@ use crate::utilities::class_group::scalar_to_bigint;
 use k256::{Scalar, ProjectivePoint};
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use num_bigint::{BigInt, Sign};
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Signature {
     pub s: Scalar,
     pub r: Scalar,

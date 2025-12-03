@@ -3,25 +3,24 @@ use classgroup::gmp_classgroup::*;
 use classgroup::ClassGroup;
 use k256::Scalar;
 use k256::elliptic_curve::PrimeField;
+use k256::elliptic_curve::Field;
 use num_bigint::{BigInt, Sign, RandBigInt};
 use num_traits::{Zero, Num};
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use rand::rngs::OsRng;
-use k256::elliptic_curve::Field;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CLGroup {
     pub delta_k: Mpz,
     pub gq: GmpClassGroup,
     pub stilde: Mpz,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct PK(pub GmpClassGroup);
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Ciphertext {
     pub c1: GmpClassGroup,
     pub c2: GmpClassGroup,
@@ -39,7 +38,7 @@ impl From<GmpClassGroup> for PK {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct SK(pub Mpz);
 
 impl From<SK> for Mpz {
