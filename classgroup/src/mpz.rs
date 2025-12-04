@@ -143,21 +143,19 @@ impl Mpz {
             panic!("divide by zero");
         }
 
-        let result = &self.inner % &modulo.inner;
-        
-        // Ensure non-negative result
-        let result = if result.sign() == Sign::Minus {
-            result + &modulo.inner
-        } else {
-            result
-        };
-
-        Mpz { inner: result }
+        // Use mod_floor which is more efficient for this use case
+        Mpz {
+            inner: self.inner.mod_floor(&modulo.inner),
+        }
     }
 
     pub fn div_floor(&self, other: &Mpz) -> Mpz {
         if other.is_zero() {
             panic!("divide by zero");
+        }
+        // Fast path for division by 1
+        if other.is_one() {
+            return self.clone();
         }
         Mpz {
             inner: self.inner.div_floor(&other.inner),
@@ -174,12 +172,20 @@ impl Mpz {
     }
 
     pub fn gcd(&self, other: &Mpz) -> Mpz {
+        // Fast path for common cases
+        if self.is_zero() {
+            return other.abs();
+        }
+        if other.is_zero() {
+            return self.abs();
+        }
         Mpz {
             inner: self.inner.gcd(&other.inner),
         }
     }
 
     pub fn gcdext(&self, other: &Mpz) -> (Mpz, Mpz, Mpz) {
+        use num_integer::Integer;
         let extended_gcd = self.inner.extended_gcd(&other.inner);
         
         (
@@ -219,9 +225,8 @@ impl Mpz {
             }
         }
 
-        // Use modpow from num-bigint
-        let base = self.modulus(modulus);
-        let result = base.inner.modpow(&exp.inner, &modulus.inner);
+        // Use modpow directly without extra modulus operation
+        let result = self.inner.modpow(&exp.inner, &modulus.inner);
         
         Mpz { inner: result }
     }

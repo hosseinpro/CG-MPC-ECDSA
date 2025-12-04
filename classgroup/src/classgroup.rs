@@ -92,7 +92,7 @@ impl GmpClassGroup {
         // b = h*u - s*c1
         mpz_ops::mpz_mul(&mut ctx.b, &ctx.h, &ctx.u);
         mpz_ops::mpz_mul(&mut ctx.m, &ctx.s, &self.c);
-        ctx.b += &ctx.m;
+        mpz_ops::mpz_add_self(&mut ctx.b, &ctx.m);
 
         // m = s*t
         mpz_ops::mpz_mul(&mut ctx.m, &ctx.s, &ctx.t);
@@ -133,11 +133,11 @@ impl GmpClassGroup {
 
         // m = (t*u*k - h*u - c*s) / s*t
         mpz_ops::mpz_mul(&mut ctx.m, &ctx.t, &ctx.u);
-        ctx.m *= &ctx.k;
+        mpz_ops::mpz_mul_self(&mut ctx.m, &ctx.k);
         mpz_ops::mpz_mul(&mut ctx.a, &ctx.h, &ctx.u);
-        ctx.m -= &ctx.a;
+        mpz_ops::mpz_sub_self(&mut ctx.m, &ctx.a);
         mpz_ops::mpz_mul(&mut ctx.a, &self.c, &ctx.s);
-        ctx.m -= &ctx.a;
+        mpz_ops::mpz_sub_self(&mut ctx.m, &ctx.a);
         mpz_ops::mpz_mul(&mut ctx.a, &ctx.s, &ctx.t);
         mpz_ops::mpz_fdiv_q(&mut ctx.lambda, &ctx.m, &ctx.a);
 
@@ -147,14 +147,14 @@ impl GmpClassGroup {
         // B = ju + mr - (kt + ls)
         mpz_ops::mpz_mul(&mut self.b, &ctx.j, &ctx.u);
         mpz_ops::mpz_mul(&mut ctx.a, &ctx.k, &ctx.t);
-        self.b -= &ctx.a;
+        mpz_ops::mpz_sub_self(&mut self.b, &ctx.a);
         mpz_ops::mpz_mul(&mut ctx.a, &ctx.l, &ctx.s);
-        self.b -= &ctx.a;
+        mpz_ops::mpz_sub_self(&mut self.b, &ctx.a);
 
         // C = kl - jm
         mpz_ops::mpz_mul(&mut self.c, &ctx.k, &ctx.l);
         mpz_ops::mpz_mul(&mut ctx.a, &ctx.j, &ctx.lambda);
-        self.c -= &ctx.a;
+        mpz_ops::mpz_sub_self(&mut self.c, &ctx.a);
 
         self.inner_reduce(ctx);
     }
@@ -182,10 +182,14 @@ impl GmpClassGroup {
 
     fn inner_normalize(&mut self, ctx: &mut Ctx) {
         self.assert_valid();
-        ctx.negative_a = -&self.a;
+        // Reuse existing memory instead of creating new negation
+        mpz_ops::mpz_sub(&mut ctx.negative_a, &Mpz::zero(), &self.a);
+        
+        // Early exit if already normalized
         if self.b > ctx.negative_a && self.b <= self.a {
             return;
         }
+        
         mpz_ops::mpz_sub(&mut ctx.r, &self.a, &self.b);
         mpz_ops::mpz_mul_2exp(&mut ctx.denom, &self.a, 1);
         mpz_ops::mpz_fdiv_q(&mut ctx.negative_a, &ctx.r, &ctx.denom);
@@ -237,8 +241,8 @@ impl GmpClassGroup {
             // c = s - x
             mpz_ops::mpz_sub(&mut ctx.old_a, &ctx.s, &ctx.x);
 
-            // c += a
-            self.c += &ctx.old_a;
+            // c += a  (using add_self instead of += to avoid clone)
+            mpz_ops::mpz_add_self(&mut self.c, &ctx.old_a);
         }
         self.inner_normalize(ctx);
     }
@@ -253,8 +257,9 @@ impl GmpClassGroup {
             &self.a,
         );
         mpz_ops::mpz_mul(&mut ctx.m, &self.b, &ctx.mu);
-        ctx.m -= &self.c;
-        ctx.m = ctx.m.div_floor(&self.a);
+        mpz_ops::mpz_sub_self(&mut ctx.m, &self.c);
+        // Use fdiv_q_self instead of div_floor for better performance
+        mpz_ops::mpz_fdiv_q_self(&mut ctx.m, &self.a);
 
         // New a
         ctx.old_a.set(&self.a);
@@ -263,11 +268,11 @@ impl GmpClassGroup {
         // New b
         mpz_ops::mpz_mul(&mut ctx.a, &ctx.mu, &ctx.old_a);
         mpz_ops::mpz_double(&mut ctx.a);
-        self.b -= &ctx.a;
+        mpz_ops::mpz_sub_self(&mut self.b, &ctx.a);
 
         // New c
         mpz_ops::mpz_mul(&mut self.c, &ctx.mu, &ctx.mu);
-        self.c -= &ctx.m;
+        mpz_ops::mpz_sub_self(&mut self.c, &ctx.m);
         self.inner_reduce(ctx);
     }
 

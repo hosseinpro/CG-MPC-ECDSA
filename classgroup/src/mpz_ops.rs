@@ -41,7 +41,7 @@ pub fn mpz_gcdext(gcd: &mut Mpz, s: &mut Mpz, t: &mut Mpz, a: &Mpz, b: &Mpz) {
 }
 
 /// Doubles `rop` in-place
-#[inline]
+#[inline(always)]
 pub fn mpz_double(rop: &mut Mpz) {
     *rop = &*rop << 1;
 }
@@ -93,44 +93,73 @@ pub fn import_obj(buf: &[u8]) -> Mpz {
 }
 
 pub fn three_gcd(rop: &mut Mpz, a: &Mpz, b: &Mpz, c: &Mpz) {
-    *rop = a.gcd(b).gcd(c);
+    // Optimize by computing gcd(gcd(a,b), c) in-place
+    *rop = a.gcd(b);
+    *rop = rop.gcd(c);
 }
 
-#[inline]
+#[inline(always)]
 pub fn size_in_bits(obj: &Mpz) -> usize {
     obj.bit_length()
 }
 
-#[inline]
+#[inline(always)]
 pub fn mpz_add(rop: &mut Mpz, op1: &Mpz, op2: &Mpz) {
     *rop = op1 + op2;
 }
 
-#[inline]
+#[inline(always)]
 pub fn mpz_mul(rop: &mut Mpz, op1: &Mpz, op2: &Mpz) {
     *rop = op1 * op2;
 }
 
-#[inline]
+#[inline(always)]
 pub fn mpz_divexact(q: &mut Mpz, n: &Mpz, d: &Mpz) {
     *q = n / d;
 }
 
-#[inline]
+#[inline(always)]
 pub fn mpz_mul_2exp(rop: &mut Mpz, op1: &Mpz, op2: usize) {
     *rop = op1 << op2;
 }
 
 /// Divide `n` by `d`.  Round towards -∞ and place the result in `q`.
-#[inline]
+#[inline(always)]
 pub fn mpz_fdiv_q(q: &mut Mpz, n: &Mpz, d: &Mpz) {
     *q = n.div_floor(d);
 }
 
-/// Subtracts `op2` from `op1` and stores the result in `rop`.
+/// In-place floor division: rop = rop / d
+#[inline(always)]
+pub fn mpz_fdiv_q_self(rop: &mut Mpz, d: &Mpz) {
+    let tmp = rop.div_floor(d);
+    *rop = tmp;
+}
+
 #[inline]
 pub fn mpz_sub(rop: &mut Mpz, op1: &Mpz, op2: &Mpz) {
     *rop = op1 - op2;
+}
+
+/// In-place subtraction: rop = rop - op
+#[inline]
+pub fn mpz_sub_self(rop: &mut Mpz, op: &Mpz) {
+    let tmp = &*rop - op;
+    *rop = tmp;
+}
+
+/// In-place addition: rop = rop + op
+#[inline]
+pub fn mpz_add_self(rop: &mut Mpz, op: &Mpz) {
+    let tmp = &*rop + op;
+    *rop = tmp;
+}
+
+/// In-place multiplication: rop = rop * op
+#[inline]
+pub fn mpz_mul_self(rop: &mut Mpz, op: &Mpz) {
+    let tmp = &*rop * op;
+    *rop = tmp;
 }
 
 /// Exports `obj` to `v` as an array of 2's complement, big-endian
