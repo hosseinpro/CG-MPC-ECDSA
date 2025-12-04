@@ -17,8 +17,6 @@ pub enum MulEcdsaError {
     XcoorNone,
     #[error("Verify multi-party ECDSA signature failed")]
     VrfyMultiECDSAFailed,
-    #[error("Verify class group pk failed")]
-    VrfyClassGroupFailed,
     #[error("Get index failed")]
     GetIndexFailed,
     #[error("Serialize failed ")]
@@ -47,12 +45,6 @@ pub enum MulEcdsaError {
     ComputeDeltaSumFailed,
     #[error("Verify ElgamalProof failed")]
     VrfyElgamalProofFailed,
-    #[error("Verify CLEncProof failed")]
-    VrfyClEncProofFailed,
-    #[error("Verify CLDLProof Failed")]
-    VrfyCLDLProofFailed,
-    #[error("Verify CLProof Failed")]
-    VrfyCLProofFailed,
     #[error("Not load keygen result")]
     NotLoadKeyGenResult,
     #[error("Invalid public key")]

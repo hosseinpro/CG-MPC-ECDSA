@@ -4,7 +4,7 @@ use crate::utilities::error::MulEcdsaError;
 use crate::utilities::k256_helpers::DLogProof;
 use k256::{Scalar, ProjectivePoint};
 use k256::elliptic_curve::Field;
-use crate::utilities::class_group::{scalar_to_bigint, scalar_from_bigint};
+use crate::utilities::paillier::{scalar_to_bigint, scalar_from_bigint};
 use num_bigint::BigInt;
 use rand::rngs::OsRng;
 use std::cmp;
@@ -28,7 +28,6 @@ pub struct Sign {
     pub r_x: Scalar,
     pub message: Scalar,
     pub dl_proof: DLogProof<ProjectivePoint>,
-    pub online_offline: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -45,7 +44,7 @@ pub struct NonceKEMsg {
 }
 
 impl Sign {
-    pub fn new(message_bytes: &[u8], online_offline: bool) -> Result<Self, MulEcdsaError> {
+    pub fn new(message_bytes: &[u8]) -> Result<Self, MulEcdsaError> {
         let reshared_secret_share = Scalar::random(&mut OsRng);
         let reshared_public_share = ProjectivePoint::GENERATOR * reshared_secret_share;
         
@@ -68,7 +67,6 @@ impl Sign {
             r_x: Scalar::random(&mut OsRng),
             message,
             dl_proof,
-            online_offline,
         };
         Ok(ret)
     }

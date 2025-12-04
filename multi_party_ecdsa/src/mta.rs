@@ -1,15 +1,15 @@
-use crate::utilities::cl_proof::*;
-use crate::utilities::class_group::*;
-use crate::utilities::clkeypair::*;
+// MTA (Multiplicative-to-Additive) protocol using pure Paillier encryption
 use k256::Scalar;
 use k256::elliptic_curve::Field;
 use rand::rngs::OsRng;
+use crate::utilities::paillier::{self, Pk, Sk, Ct, encrypt, decrypt, eval_sum, eval_scal, scalar_to_bigint};
 
 #[derive(Clone, Debug)]
 pub struct PartyOne {
     pub b: Scalar,
     pub t_b: Scalar,
-    pub cl_keypair: ClKeyPair,
+    pub paillier_sk: Sk,
+    pub paillier_pk: Pk,
 }
 
 #[derive(Clone, Debug)]
@@ -20,27 +20,25 @@ pub struct PartyTwo {
 
 impl PartyOne {
     pub fn new(b: Scalar) -> Self {
-        let cl_keypair = ClKeyPair::new(&GROUP_128);
+        let (paillier_sk, paillier_pk) = paillier::keygen(2048);
         Self {
             b,
             t_b: Scalar::random(&mut OsRng),
-            cl_keypair,
+            paillier_sk,
+            paillier_pk,
         }
     }
 
-    pub fn generate_send_msg(&self, cl_pk: &PK) -> (CLProof, CLState) {
-        let (c_b, r) = CLGroup::encrypt(&GROUP_128, cl_pk, &self.b);
-        let witness = CLWit { x: self.b, r };
-        let statement = CLState {
-            cipher: c_b,
-            cl_pub_key: (*cl_pk).clone(),
-        };
-        let cl_proof = CLProof::prove(&GROUP_128, witness, statement.clone());
-        (cl_proof, statement)
+    pub fn get_public_key(&self) -> &Pk {
+        &self.paillier_pk
     }
 
-    pub fn handle_receive_msg(&mut self, cl_sk: &SK, c_a: &Ciphertext) {
-        self.t_b = CLGroup::decrypt(&GROUP_128, cl_sk, c_a);
+    pub fn generate_send_msg(&self) -> Ct {
+        encrypt(&self.paillier_pk, &self.b)
+    }
+
+    pub fn handle_receive_msg(&mut self, c_a: &Ct) {
+        self.t_b = decrypt(&self.paillier_sk, c_a);
     }
 }
 
@@ -54,20 +52,21 @@ impl PartyTwo {
 
     pub fn receive_and_send_msg(
         &mut self,
-        proof_cl: CLProof,
-        statement: CLState,
-    ) -> Result<Ciphertext, String> {
+        c_b: Ct,
+        pk: &Pk,
+    ) -> Ct {
         let alpha_tag = Scalar::random(&mut OsRng);
         let alpha = -alpha_tag;
         self.t_a = alpha;
 
-        //verify cl-encryption dl proof
-        proof_cl
-            .verify(&GROUP_128, statement.clone())
-            .map_err(|_| "verify cl encryption dl proof failed")?;
-        let encrypted_alpha_tag = CLGroup::encrypt(&GROUP_128, &statement.cl_pub_key, &alpha_tag);
-        let a_scal_c_b = CLGroup::eval_scal(&statement.cipher, into_mpz(&self.a));
-        let c_a = CLGroup::eval_sum(&a_scal_c_b, &encrypted_alpha_tag.0);
-        return Ok(c_a);
+        // Compute a * c_b using scalar multiplication
+        let a_bigint = scalar_to_bigint(&self.a);
+        let a_scal_c_b = eval_scal(&c_b, &a_bigint, pk);
+        
+        // Encrypt alpha_tag and add to result
+        let encrypted_alpha_tag = encrypt(pk, &alpha_tag);
+        let c_a = eval_sum(&a_scal_c_b, &encrypted_alpha_tag, pk);
+        
+        c_a
     }
 }

@@ -1,5 +1,5 @@
 use crate::utilities::error::MulEcdsaError;
-use crate::utilities::class_group::scalar_to_bigint;
+use crate::utilities::paillier::scalar_to_bigint;
 use k256::{Scalar, ProjectivePoint};
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use num_bigint::{BigInt, Sign};

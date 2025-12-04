@@ -1,6 +1,4 @@
 use super::*;
-use crate::utilities::class_group::*;
-use crate::utilities::clkeypair::ClKeyPair;
 use k256::Scalar;
 use k256::elliptic_curve::Field;
 use k256::elliptic_curve::PrimeField;
@@ -14,14 +12,27 @@ use k256::ecdsa::signature::Signature;
 fn mta_test() {
     let a = Scalar::random(&mut OsRng);
     let b = Scalar::random(&mut OsRng);
-    let cl_keypair = ClKeyPair::new(&GROUP_128);
+
+    let start_time = std::time::Instant::now();
+    
+    // PartyOne creates Paillier keypair and encrypts their value
     let mut mta_party_one = mta::PartyOne::new(a);
     let mut mta_party_two = mta::PartyTwo::new(b);
-    let mta_first_round_msg = mta_party_one.generate_send_msg(&cl_keypair.cl_pub_key);
-    let mta_second_round_msg = mta_party_two
-        .receive_and_send_msg(mta_first_round_msg.0, mta_first_round_msg.1)
-        .unwrap();
-    mta_party_one.handle_receive_msg(&cl_keypair.cl_priv_key, &mta_second_round_msg);
+    
+    // PartyOne sends their public key and encrypted value
+    let pk = mta_party_one.get_public_key();
+    let c_b = mta_party_one.generate_send_msg();
+    
+    // PartyTwo receives and processes, returns encrypted result
+    let c_a = mta_party_two.receive_and_send_msg(c_b, pk);
+    
+    // PartyOne decrypts the result
+    mta_party_one.handle_receive_msg(&c_a);
+
+    let elapsed_time = start_time.elapsed();
+    println!("Signing time: {} ms", elapsed_time.as_millis());
+
+    // Verify that a * b = t_a + t_b
     assert_eq!(a * b, mta_party_two.t_a + mta_party_one.t_b);
 }
 #[test]
@@ -39,7 +50,7 @@ fn party_two_test() {
     let x2 = secret_key - x1;              // party_two's share
     
     // Create public shares from the secret shares
-   let party_one_public_share = k256::ProjectivePoint::GENERATOR * x1;
+    let party_one_public_share = k256::ProjectivePoint::GENERATOR * x1;
     let party_two_public_share = k256::ProjectivePoint::GENERATOR * x2;
     
     // Calculate the combined public key
@@ -67,24 +78,27 @@ fn party_two_test() {
     
     let start_time = std::time::Instant::now();
 
-    let mut party_one_sign = party_one::Sign::new(&message_hash, false).unwrap();
-    let mut party_two_sign = party_two::Sign::new(&message_hash, false).unwrap();
+    let mut party_one_sign = party_one::Sign::new(&message_hash).unwrap();
+    let mut party_two_sign = party_two::Sign::new(&message_hash).unwrap();
     party_one_sign.keygen_result = Some(party_one_key);
     party_two_sign.keygen_result = Some(party_two_key);
     let party_two_nonce_com = party_two_sign.generate_nonce_com();
     party_one_sign.get_nonce_com(&party_two_nonce_com);
 
-    //mta begin;
-    let cl_keypair = ClKeyPair::new(&GROUP_128);
-    let mut mta_party_one =
-        mta::PartyOne::new(party_one_sign.reshared_secret_share);
+    //mta begin - using Paillier encryption
+    let mut mta_party_one = mta::PartyOne::new(party_one_sign.reshared_secret_share);
     let mut mta_party_two = mta::PartyTwo::new(party_two_sign.nonce_secret_share);
 
-    let mta_first_round_msg = mta_party_one.generate_send_msg(&cl_keypair.cl_pub_key);
-    let mta_second_round_msg = mta_party_two
-        .receive_and_send_msg(mta_first_round_msg.0, mta_first_round_msg.1)
-        .unwrap();
-    mta_party_one.handle_receive_msg(&cl_keypair.cl_priv_key, &mta_second_round_msg);
+    // PartyOne sends their public key and encrypted value
+    let pk = mta_party_one.get_public_key();
+    let c_b = mta_party_one.generate_send_msg();
+    
+    // PartyTwo receives and processes, returns encrypted result
+    let c_a = mta_party_two.receive_and_send_msg(c_b, pk);
+    
+    // PartyOne decrypts the result
+    mta_party_one.handle_receive_msg(&c_a);
+    
     let mta_consistency_msg = party_one_sign.generate_mta_consistency(mta_party_one.t_b);
 
     party_two_sign
@@ -106,7 +120,7 @@ fn party_two_test() {
     let signature = party_one_sign.online_sign(&s_2).unwrap();
 
     let elapsed_time = start_time.elapsed();
-    println!("Signing time: {} ms ({} µs)", elapsed_time.as_millis(), elapsed_time.as_micros());
+    println!("Signing time: {} ms", elapsed_time.as_millis());
     
     // Convert our r,s to k256 signature format
     let r = signature.r.to_bytes().to_vec();
