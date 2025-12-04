@@ -1,5 +1,5 @@
-use super::mpz::Mpz;
-use super::mpz_ops;
+use crate::mpz::Mpz;
+use crate::mpz_ops;
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct CongruenceContext {

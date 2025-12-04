@@ -1,4 +1,4 @@
-use classgroup::gmp_classgroup::*;
+use classgroup::classgroup::*;
 use classgroup::{ClassGroup, Mpz};
 use k256::Scalar;
 use k256::elliptic_curve::PrimeField;

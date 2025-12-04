@@ -1,7 +1,7 @@
 extern crate alloc;
 use alloc::vec::Vec;
 
-pub use super::mpz::Mpz;
+pub use crate::mpz::Mpz;
 use num_traits::{Zero};
 
 pub fn mpz_crem_u16(n: &Mpz, d: u16) -> u16 {

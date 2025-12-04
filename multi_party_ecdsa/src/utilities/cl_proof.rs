@@ -1,7 +1,7 @@
 use crate::utilities::class_group::*;
 use crate::utilities::error::MulEcdsaError;
 use crate::utilities::SECURITY_PARAMETER;
-use classgroup::gmp_classgroup::*;
+use classgroup::classgroup::*;
 use classgroup::{ClassGroup, Mpz};
 use k256::Scalar;
 use k256::elliptic_curve::Field; 

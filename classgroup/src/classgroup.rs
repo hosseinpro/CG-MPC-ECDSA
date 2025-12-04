@@ -1,6 +1,8 @@
-use mpz::Mpz;
-use mpz::ProbabPrimeResult::NotPrime;
-use super::ClassGroup;
+use crate::mpz::Mpz;
+use crate::mpz::ProbabPrimeResult::NotPrime;
+use crate::congruence;
+use crate::mpz_ops;
+use crate::ClassGroup;
 use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -9,9 +11,6 @@ use std::{
     mem::swap,
     ops::{Mul, MulAssign},
 };
-mod congruence;
-pub(super) mod mpz_ops;
-pub mod mpz;
 
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Clone, Deserialize, Serialize)]
 pub struct GmpClassGroup {

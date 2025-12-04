@@ -1,12 +1,15 @@
 use num_traits::{One, Zero};
 use std::ops::{Mul, MulAssign, Rem, ShlAssign};
 
-pub mod gmp_classgroup;
-pub use self::gmp_classgroup::{
-    do_compute,
-    mpz::Mpz,
-    mpz_ops::{export_obj, import_obj},
-};
+pub mod mpz;
+pub mod mpz_ops;
+mod congruence;
+pub mod classgroup;
+
+pub use self::mpz::Mpz;
+pub use self::mpz_ops::{export_obj, import_obj};
+pub use self::classgroup::{do_compute, GmpClassGroup};
+
 pub trait BigNum:
     Zero
     + One
@@ -165,8 +168,7 @@ mod test {
     };
 
     use num_traits::Zero;
-    use super::gmp::mpz::Mpz;
-    use super::{gmp_classgroup::GmpClassGroup, ClassGroup};
+    use super::{mpz::Mpz, classgroup::GmpClassGroup, ClassGroup};
 
     fn split_into_three_pieces(line: &str, c: char) -> [&str; 3] {
         let mut iter = line.split(c);

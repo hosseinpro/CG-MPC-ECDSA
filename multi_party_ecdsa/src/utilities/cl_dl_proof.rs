@@ -3,7 +3,7 @@ use crate::utilities::error::MulEcdsaError;
 use crate::utilities::SECURITY_PARAMETER;
 use crate::utilities::k256_helpers::ProjectivePointExt;
 use classgroup::{Mpz, ClassGroup};
-use classgroup::gmp_classgroup::*;
+use classgroup::classgroup::*;
 use k256::{Scalar, ProjectivePoint};
 use num_bigint::{BigInt, Sign};
 use num_traits::{Zero, One};
