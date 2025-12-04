@@ -1,8 +1,6 @@
-#![cfg_attr(not(test), no_std)]
-
 extern crate alloc;
-use alloc::{string::String, vec::Vec, format};
-use core::cmp::Ordering::{self, Equal, Greater, Less};
+use alloc::{string::String, vec::Vec};
+use core::cmp::Ordering;
 use core::convert::From;
 use core::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
@@ -11,7 +9,7 @@ use core::ops::{
 use core::str::FromStr;
 use core::{fmt, hash};
 
-use num_bigint::{BigInt, BigUint, Sign as NumSign};
+use num_bigint::{BigInt, Sign as NumSign};
 use num_traits::{One, Zero, Signed, ToPrimitive, Num};
 use num_integer::Integer as IntegerTrait;
 use serde::de;
@@ -188,8 +186,6 @@ impl Mpz {
     }
 
     pub fn gcdext(&self, other: &Mpz) -> (Mpz, Mpz, Mpz) {
-        use num_integer::ExtendedGcd;
-        
         let extended_gcd = self.inner.extended_gcd(&other.inner);
         
         (

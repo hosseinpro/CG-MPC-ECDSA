@@ -1,30 +1,6 @@
-// Copyright 2018 Chia Network Inc and POA Networks Ltd.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-#![forbid(unsafe_code)]
 use super::super::gmp::mpz::Mpz;
 use super::mpz_ops;
 
-/// Stores temporary values for congruence computations, to avoid
-/// repeated allocations.
-///
-/// It is allowed (but inefficient) to generate a fresh `CongruenceContest`
-/// for each call to `solve_linear_congruence`.
-///
-/// `self.solve_linear_congruence` can be called no matter what values
-/// this struct’s public members hold, so long as they are valid `Mpz` values.
-/// However, the values of these members after such a call must not be relied
-/// on.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct CongruenceContext {
     pub g: Mpz,
@@ -32,9 +8,6 @@ pub struct CongruenceContext {
     pub q: Mpz,
     pub r: Mpz,
 }
-
-// #[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
-// struct NoCongruence;
 
 impl Default for CongruenceContext {
     fn default() -> Self {
