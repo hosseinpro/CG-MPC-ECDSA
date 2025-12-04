@@ -1,4 +1,4 @@
-use super::super::gmp::mpz::Mpz;
+use super::mpz::Mpz;
 use super::mpz_ops;
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]

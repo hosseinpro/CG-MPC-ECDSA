@@ -1,11 +1,10 @@
 use num_traits::{One, Zero};
 use std::ops::{Mul, MulAssign, Rem, ShlAssign};
 
-pub mod gmp;
-
 pub mod gmp_classgroup;
 pub use self::gmp_classgroup::{
     do_compute,
+    mpz::Mpz,
     mpz_ops::{export_obj, import_obj},
 };
 pub trait BigNum:

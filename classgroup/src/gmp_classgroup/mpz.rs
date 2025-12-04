@@ -9,15 +9,13 @@ use core::ops::{
 use core::str::FromStr;
 use core::{fmt, hash};
 
-use num_bigint::{BigInt, Sign as NumSign};
+use num_bigint::{BigInt, Sign};
 use num_traits::{One, Zero, Signed, ToPrimitive, Num};
 use num_integer::Integer as IntegerTrait;
 use serde::de;
 use serde::de::Visitor;
 use serde::ser::{Serialize, Serializer};
 use serde::{Deserialize, Deserializer};
-
-use super::sign::Sign;
 
 /// Arbitrary precision integer, compatible with GMP's Mpz API
 /// Now using num-bigint for dynamic allocation and better performance
@@ -134,11 +132,7 @@ impl Mpz {
 // Sign-related methods
 impl Mpz {
     pub fn sign(&self) -> Sign {
-        match self.inner.sign() {
-            NumSign::NoSign => Sign::Zero,
-            NumSign::Plus => Sign::Positive,
-            NumSign::Minus => Sign::Negative,
-        }
+        self.inner.sign()
     }
 }
 
@@ -152,7 +146,7 @@ impl Mpz {
         let result = &self.inner % &modulo.inner;
         
         // Ensure non-negative result
-        let result = if result.sign() == NumSign::Minus {
+        let result = if result.sign() == Sign::Minus {
             result + &modulo.inner
         } else {
             result
@@ -216,7 +210,7 @@ impl Mpz {
         }
 
         // Handle negative exponent
-        if exp.sign() == Sign::Negative {
+        if exp.sign() == Sign::Minus {
             let inv = self.invert(modulus);
             if let Some(inv_val) = inv {
                 return inv_val.powm(&(-exp), modulus);
@@ -836,7 +830,7 @@ impl From<&Mpz> for f64 {
 impl From<&[u8]> for Mpz {
     fn from(bytes: &[u8]) -> Self {
         Mpz {
-            inner: BigInt::from_bytes_be(NumSign::Plus, bytes),
+            inner: BigInt::from_bytes_be(Sign::Plus, bytes),
         }
     }
 }

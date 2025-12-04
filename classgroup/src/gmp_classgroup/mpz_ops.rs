@@ -1,7 +1,7 @@
 extern crate alloc;
 use alloc::vec::Vec;
 
-pub use super::super::gmp::mpz::Mpz;
+pub use super::mpz::Mpz;
 use num_traits::{Zero};
 
 pub fn mpz_crem_u16(n: &Mpz, d: u16) -> u16 {
@@ -16,8 +16,8 @@ pub fn mpz_frem_u32(n: &Mpz, d: u32) -> u32 {
 /// returns `false`.
 #[inline]
 pub fn mpz_is_negative(z: &Mpz) -> bool {
-    use super::super::gmp::sign::Sign;
-    z.sign() == Sign::Negative
+    use num_bigint::Sign;
+    z.sign() == Sign::Minus
 }
 
 #[inline]
