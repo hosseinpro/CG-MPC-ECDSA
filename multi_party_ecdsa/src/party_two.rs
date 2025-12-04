@@ -27,12 +27,11 @@ pub struct Sign {
     pub reshared_secret_share: Scalar,
     pub r1_rec: Scalar,
     pub r_x: Scalar,
-    online_offline: bool,
     pub msg_set: bool,
 }
 
 impl Sign {
-    pub fn new(message_bytes: &[u8], online_offline: bool) -> Result<Self, MulEcdsaError> {
+    pub fn new(message_bytes: &[u8]) -> Result<Self, MulEcdsaError> {
         let nonce_secret_share = Scalar::random(&mut OsRng);
         let nonce_public_share = ProjectivePoint::GENERATOR * nonce_secret_share;
         let dl_com_zk_com = DLComZK::new(&nonce_secret_share, &nonce_public_share);
@@ -49,7 +48,6 @@ impl Sign {
             reshared_secret_share: Scalar::random(&mut OsRng),
             r1_rec: Scalar::random(&mut OsRng),
             r_x: Scalar::random(&mut OsRng),
-            online_offline,
             msg_set: false,
         };
         Ok(ret)

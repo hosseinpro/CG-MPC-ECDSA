@@ -67,8 +67,8 @@ fn party_two_test() {
     
     let start_time = std::time::Instant::now();
 
-    let mut party_one_sign = party_one::Sign::new(&message_hash, false).unwrap();
-    let mut party_two_sign = party_two::Sign::new(&message_hash, false).unwrap();
+    let mut party_one_sign = party_one::Sign::new(&message_hash).unwrap();
+    let mut party_two_sign = party_two::Sign::new(&message_hash).unwrap();
     party_one_sign.keygen_result = Some(party_one_key);
     party_two_sign.keygen_result = Some(party_two_key);
     let party_two_nonce_com = party_two_sign.generate_nonce_com();
