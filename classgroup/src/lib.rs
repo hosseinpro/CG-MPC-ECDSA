@@ -20,7 +20,7 @@ pub mod gmp;
 pub mod gmp_classgroup;
 pub use self::gmp_classgroup::{
     do_compute,
-    ffi::{export_obj, import_obj},
+    mpz_ops::{export_obj, import_obj},
 };
 pub trait BigNum:
     Zero

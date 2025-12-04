@@ -24,7 +24,7 @@ use std::{
     ops::{Mul, MulAssign},
 };
 mod congruence;
-pub(super) mod ffi;
+pub(super) mod mpz_ops;
 
 #[derive(PartialEq, PartialOrd, Eq, Ord, Hash, Debug, Clone, Deserialize, Serialize)]
 pub struct GmpClassGroup {
@@ -75,41 +75,41 @@ impl GmpClassGroup {
         rhs.assert_valid();
 
         // g = (b1 + b2) / 2
-        ffi::mpz_add(&mut ctx.congruence_context.g, &self.b, &rhs.b);
-        ffi::mpz_fdiv_q_ui_self(&mut ctx.congruence_context.g, 2);
+        mpz_ops::mpz_add(&mut ctx.congruence_context.g, &self.b, &rhs.b);
+        mpz_ops::mpz_fdiv_q_ui_self(&mut ctx.congruence_context.g, 2);
 
         // h = (b2 - b1) / 2
-        ffi::mpz_sub(&mut ctx.h, &rhs.b, &self.b);
-        ffi::mpz_fdiv_q_ui_self(&mut ctx.h, 2);
+        mpz_ops::mpz_sub(&mut ctx.h, &rhs.b, &self.b);
+        mpz_ops::mpz_fdiv_q_ui_self(&mut ctx.h, 2);
 
         debug_assert!(&ctx.h + &ctx.congruence_context.g == rhs.b);
         debug_assert!(&ctx.congruence_context.g - &ctx.h == self.b);
 
         // w = gcd(a1, a2, g)
-        ffi::three_gcd(&mut ctx.w, &self.a, &rhs.a, &ctx.congruence_context.g);
+        mpz_ops::three_gcd(&mut ctx.w, &self.a, &rhs.a, &ctx.congruence_context.g);
 
         // j = w
         ctx.j.set(&ctx.w);
 
         // s = a1/w
-        ffi::mpz_fdiv_q(&mut ctx.s, &self.a, &ctx.w);
+        mpz_ops::mpz_fdiv_q(&mut ctx.s, &self.a, &ctx.w);
 
         // t = a2/w
-        ffi::mpz_fdiv_q(&mut ctx.t, &rhs.a, &ctx.w);
+        mpz_ops::mpz_fdiv_q(&mut ctx.t, &rhs.a, &ctx.w);
 
         // u = g/w
-        ffi::mpz_fdiv_q(&mut ctx.u, &ctx.congruence_context.g, &ctx.w);
+        mpz_ops::mpz_fdiv_q(&mut ctx.u, &ctx.congruence_context.g, &ctx.w);
 
         // a = t*u
-        ffi::mpz_mul(&mut ctx.a, &ctx.t, &ctx.u);
+        mpz_ops::mpz_mul(&mut ctx.a, &ctx.t, &ctx.u);
 
         // b = h*u - s*c1
-        ffi::mpz_mul(&mut ctx.b, &ctx.h, &ctx.u);
-        ffi::mpz_mul(&mut ctx.m, &ctx.s, &self.c);
+        mpz_ops::mpz_mul(&mut ctx.b, &ctx.h, &ctx.u);
+        mpz_ops::mpz_mul(&mut ctx.m, &ctx.s, &self.c);
         ctx.b += &ctx.m;
 
         // m = s*t
-        ffi::mpz_mul(&mut ctx.m, &ctx.s, &ctx.t);
+        mpz_ops::mpz_mul(&mut ctx.m, &ctx.s, &ctx.t);
         ctx.congruence_context.solve_linear_congruence(
             &mut ctx.mu,
             Some(&mut ctx.v),
@@ -119,11 +119,11 @@ impl GmpClassGroup {
         );
 
         // a = t*v
-        ffi::mpz_mul(&mut ctx.a, &ctx.t, &ctx.v);
+        mpz_ops::mpz_mul(&mut ctx.a, &ctx.t, &ctx.v);
 
         // b = h - t * mu
-        ffi::mpz_mul(&mut ctx.m, &ctx.t, &ctx.mu);
-        ffi::mpz_sub(&mut ctx.b, &ctx.h, &ctx.m);
+        mpz_ops::mpz_mul(&mut ctx.m, &ctx.t, &ctx.mu);
+        mpz_ops::mpz_sub(&mut ctx.b, &ctx.h, &ctx.m);
 
         // m = s
         ctx.m.set(&ctx.s);
@@ -137,37 +137,37 @@ impl GmpClassGroup {
         );
 
         // k = mu + v*lambda
-        ffi::mpz_mul(&mut ctx.a, &ctx.v, &ctx.lambda);
-        ffi::mpz_add(&mut ctx.k, &ctx.mu, &ctx.a);
+        mpz_ops::mpz_mul(&mut ctx.a, &ctx.v, &ctx.lambda);
+        mpz_ops::mpz_add(&mut ctx.k, &ctx.mu, &ctx.a);
 
         // l = (k*t - h)/s
-        ffi::mpz_mul(&mut ctx.l, &ctx.k, &ctx.t);
-        ffi::mpz_sub(&mut ctx.v, &ctx.l, &ctx.h);
-        ffi::mpz_fdiv_q(&mut ctx.l, &ctx.v, &ctx.s);
+        mpz_ops::mpz_mul(&mut ctx.l, &ctx.k, &ctx.t);
+        mpz_ops::mpz_sub(&mut ctx.v, &ctx.l, &ctx.h);
+        mpz_ops::mpz_fdiv_q(&mut ctx.l, &ctx.v, &ctx.s);
 
         // m = (t*u*k - h*u - c*s) / s*t
-        ffi::mpz_mul(&mut ctx.m, &ctx.t, &ctx.u);
+        mpz_ops::mpz_mul(&mut ctx.m, &ctx.t, &ctx.u);
         ctx.m *= &ctx.k;
-        ffi::mpz_mul(&mut ctx.a, &ctx.h, &ctx.u);
+        mpz_ops::mpz_mul(&mut ctx.a, &ctx.h, &ctx.u);
         ctx.m -= &ctx.a;
-        ffi::mpz_mul(&mut ctx.a, &self.c, &ctx.s);
+        mpz_ops::mpz_mul(&mut ctx.a, &self.c, &ctx.s);
         ctx.m -= &ctx.a;
-        ffi::mpz_mul(&mut ctx.a, &ctx.s, &ctx.t);
-        ffi::mpz_fdiv_q(&mut ctx.lambda, &ctx.m, &ctx.a);
+        mpz_ops::mpz_mul(&mut ctx.a, &ctx.s, &ctx.t);
+        mpz_ops::mpz_fdiv_q(&mut ctx.lambda, &ctx.m, &ctx.a);
 
         // A = s*t - r*u
-        ffi::mpz_mul(&mut self.a, &ctx.s, &ctx.t);
+        mpz_ops::mpz_mul(&mut self.a, &ctx.s, &ctx.t);
 
         // B = ju + mr - (kt + ls)
-        ffi::mpz_mul(&mut self.b, &ctx.j, &ctx.u);
-        ffi::mpz_mul(&mut ctx.a, &ctx.k, &ctx.t);
+        mpz_ops::mpz_mul(&mut self.b, &ctx.j, &ctx.u);
+        mpz_ops::mpz_mul(&mut ctx.a, &ctx.k, &ctx.t);
         self.b -= &ctx.a;
-        ffi::mpz_mul(&mut ctx.a, &ctx.l, &ctx.s);
+        mpz_ops::mpz_mul(&mut ctx.a, &ctx.l, &ctx.s);
         self.b -= &ctx.a;
 
         // C = kl - jm
-        ffi::mpz_mul(&mut self.c, &ctx.k, &ctx.l);
-        ffi::mpz_mul(&mut ctx.a, &ctx.j, &ctx.lambda);
+        mpz_ops::mpz_mul(&mut self.c, &ctx.k, &ctx.l);
+        mpz_ops::mpz_mul(&mut ctx.a, &ctx.j, &ctx.lambda);
         self.c -= &ctx.a;
 
         self.inner_reduce(ctx);
@@ -200,20 +200,20 @@ impl GmpClassGroup {
         if self.b > ctx.negative_a && self.b <= self.a {
             return;
         }
-        ffi::mpz_sub(&mut ctx.r, &self.a, &self.b);
-        ffi::mpz_mul_2exp(&mut ctx.denom, &self.a, 1);
-        ffi::mpz_fdiv_q(&mut ctx.negative_a, &ctx.r, &ctx.denom);
+        mpz_ops::mpz_sub(&mut ctx.r, &self.a, &self.b);
+        mpz_ops::mpz_mul_2exp(&mut ctx.denom, &self.a, 1);
+        mpz_ops::mpz_fdiv_q(&mut ctx.negative_a, &ctx.r, &ctx.denom);
         swap(&mut ctx.negative_a, &mut ctx.r);
         swap(&mut ctx.old_b, &mut self.b);
-        ffi::mpz_mul(&mut ctx.ra, &ctx.r, &self.a);
-        ffi::mpz_mul_2exp(&mut ctx.negative_a, &ctx.ra, 1);
-        ffi::mpz_add(&mut self.b, &ctx.old_b, &ctx.negative_a);
+        mpz_ops::mpz_mul(&mut ctx.ra, &ctx.r, &self.a);
+        mpz_ops::mpz_mul_2exp(&mut ctx.negative_a, &ctx.ra, 1);
+        mpz_ops::mpz_add(&mut self.b, &ctx.old_b, &ctx.negative_a);
 
-        ffi::mpz_mul(&mut ctx.negative_a, &ctx.ra, &ctx.r);
-        ffi::mpz_add(&mut ctx.old_a, &self.c, &ctx.negative_a);
+        mpz_ops::mpz_mul(&mut ctx.negative_a, &ctx.ra, &ctx.r);
+        mpz_ops::mpz_add(&mut ctx.old_a, &self.c, &ctx.negative_a);
 
-        ffi::mpz_mul(&mut ctx.ra, &ctx.r, &ctx.old_b);
-        ffi::mpz_add(&mut self.c, &ctx.old_a, &ctx.ra);
+        mpz_ops::mpz_mul(&mut ctx.ra, &ctx.r, &ctx.old_b);
+        mpz_ops::mpz_add(&mut self.c, &ctx.old_a, &ctx.ra);
 
         self.assert_valid();
     }
@@ -221,35 +221,35 @@ impl GmpClassGroup {
     fn inner_reduce(&mut self, ctx: &mut Ctx) {
         self.inner_normalize(ctx);
 
-        while if ffi::mpz_is_negative(&self.b) {
+        while if mpz_ops::mpz_is_negative(&self.b) {
             self.a >= self.c
         } else {
             self.a > self.c
         } {
             debug_assert!(!self.c.is_zero());
-            ffi::mpz_add(&mut ctx.s, &self.c, &self.b);
-            ffi::mpz_add(&mut ctx.x, &self.c, &self.c);
+            mpz_ops::mpz_add(&mut ctx.s, &self.c, &self.b);
+            mpz_ops::mpz_add(&mut ctx.x, &self.c, &self.c);
             swap(&mut self.b, &mut ctx.old_b);
-            ffi::mpz_fdiv_q(&mut self.b, &ctx.s, &ctx.x);
+            mpz_ops::mpz_fdiv_q(&mut self.b, &ctx.s, &ctx.x);
             swap(&mut self.b, &mut ctx.s);
             swap(&mut self.a, &mut self.c);
 
             // x = 2sc
-            ffi::mpz_mul(&mut self.b, &ctx.s, &self.a);
-            ffi::mpz_mul_2exp(&mut ctx.x, &self.b, 1);
+            mpz_ops::mpz_mul(&mut self.b, &ctx.s, &self.a);
+            mpz_ops::mpz_mul_2exp(&mut ctx.x, &self.b, 1);
 
             // b = x - old_b
-            ffi::mpz_sub(&mut self.b, &ctx.x, &ctx.old_b);
+            mpz_ops::mpz_sub(&mut self.b, &ctx.x, &ctx.old_b);
 
             // x = b*s
-            ffi::mpz_mul(&mut ctx.x, &ctx.old_b, &ctx.s);
+            mpz_ops::mpz_mul(&mut ctx.x, &ctx.old_b, &ctx.s);
 
             // s = c*s^2
-            ffi::mpz_mul(&mut ctx.old_b, &ctx.s, &ctx.s);
-            ffi::mpz_mul(&mut ctx.s, &self.a, &ctx.old_b);
+            mpz_ops::mpz_mul(&mut ctx.old_b, &ctx.s, &ctx.s);
+            mpz_ops::mpz_mul(&mut ctx.s, &self.a, &ctx.old_b);
 
             // c = s - x
-            ffi::mpz_sub(&mut ctx.old_a, &ctx.s, &ctx.x);
+            mpz_ops::mpz_sub(&mut ctx.old_a, &ctx.s, &ctx.x);
 
             // c += a
             self.c += &ctx.old_a;
@@ -266,21 +266,21 @@ impl GmpClassGroup {
             &self.c,
             &self.a,
         );
-        ffi::mpz_mul(&mut ctx.m, &self.b, &ctx.mu);
+        mpz_ops::mpz_mul(&mut ctx.m, &self.b, &ctx.mu);
         ctx.m -= &self.c;
         ctx.m = ctx.m.div_floor(&self.a);
 
         // New a
         ctx.old_a.set(&self.a);
-        ffi::mpz_mul(&mut self.a, &ctx.old_a, &ctx.old_a);
+        mpz_ops::mpz_mul(&mut self.a, &ctx.old_a, &ctx.old_a);
 
         // New b
-        ffi::mpz_mul(&mut ctx.a, &ctx.mu, &ctx.old_a);
-        ffi::mpz_double(&mut ctx.a);
+        mpz_ops::mpz_mul(&mut ctx.a, &ctx.mu, &ctx.old_a);
+        mpz_ops::mpz_double(&mut ctx.a);
         self.b -= &ctx.a;
 
         // New c
-        ffi::mpz_mul(&mut self.c, &ctx.mu, &ctx.mu);
+        mpz_ops::mpz_mul(&mut self.c, &ctx.mu, &ctx.mu);
         self.c -= &ctx.m;
         self.inner_reduce(ctx);
     }
@@ -347,16 +347,16 @@ impl super::BigNum for Mpz {
     }
 
     fn mod_powm(&mut self, base: &Self, exponent: &Self, modulus: &Self) {
-        ffi::mpz_powm(self, base, exponent, modulus)
+        mpz_ops::mpz_powm(self, base, exponent, modulus)
     }
 }
 
 impl super::BigNumExt for Mpz {
     fn frem_u32(&self, modulus: u32) -> u32 {
-        ffi::mpz_frem_u32(self, modulus)
+        mpz_ops::mpz_frem_u32(self, modulus)
     }
     fn crem_u16(&mut self, modulus: u16) -> u16 {
-        ffi::mpz_crem_u16(self, modulus)
+        mpz_ops::mpz_crem_u16(self, modulus)
     }
 }
 
@@ -405,8 +405,8 @@ impl ClassGroup for GmpClassGroup {
             Err(0)
         } else {
             let len = buf.len() >> 1;
-            ffi::export_obj(&self.a, &mut buf[..len])?;
-            ffi::export_obj(&self.b, &mut buf[len..])
+            mpz_ops::export_obj(&self.a, &mut buf[..len])?;
+            mpz_ops::export_obj(&self.b, &mut buf[len..])
         }
     }
 
@@ -418,9 +418,9 @@ impl ClassGroup for GmpClassGroup {
     }
 
     fn from_bytes(bytearray: &[u8], discriminant: Self::BigNum) -> Self {
-        let len = (ffi::size_in_bits(&discriminant) + 16) >> 4;
-        let a = ffi::import_obj(&bytearray[..len]);
-        let b = ffi::import_obj(&bytearray[len..]);
+        let len = (mpz_ops::size_in_bits(&discriminant) + 16) >> 4;
+        let a = mpz_ops::import_obj(&bytearray[..len]);
+        let b = mpz_ops::import_obj(&bytearray[len..]);
         Self::from_ab_discriminant(a, b, discriminant)
     }
 
@@ -443,7 +443,7 @@ impl ClassGroup for GmpClassGroup {
     }
 
     fn size_in_bits(num: &Self::BigNum) -> usize {
-        ffi::size_in_bits(num)
+        mpz_ops::size_in_bits(num)
     }
 
     /// Reduce `self`.
@@ -461,8 +461,8 @@ impl ClassGroup for GmpClassGroup {
         debug_assert!(len & 1 == 0, "Buffer must be of even length");
         let half_len = len >> 1;
         Self::from_ab_discriminant(
-            ffi::import_obj(&buf[..half_len]),
-            ffi::import_obj(&buf[half_len..]),
+            mpz_ops::import_obj(&buf[..half_len]),
+            mpz_ops::import_obj(&buf[half_len..]),
             discriminant,
         )
     }
