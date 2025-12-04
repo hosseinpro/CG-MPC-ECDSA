@@ -1,12 +1,6 @@
 #![warn(deprecated)]
 #![allow(non_camel_case_types)]
+#![cfg_attr(not(test), no_std)]
 
-extern crate libc;
-extern crate num_traits;
-
-mod ffi;
 pub mod mpz;
 pub mod sign;
-
-#[cfg(test)]
-mod test;

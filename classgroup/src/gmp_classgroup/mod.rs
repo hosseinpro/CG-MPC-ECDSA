@@ -190,7 +190,7 @@ impl GmpClassGroup {
         if cfg!(debug_assertions) {
             let four: Mpz = 4u64.into();
             let four_ac: Mpz = four * &self.a * &self.c;
-            assert!(&self.discriminant + four_ac == &self.b * &self.b);
+            assert!(&self.discriminant + &four_ac == &self.b * &self.b);
         }
     }
 

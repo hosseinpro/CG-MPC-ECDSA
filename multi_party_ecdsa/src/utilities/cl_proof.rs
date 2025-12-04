@@ -7,7 +7,7 @@ use classgroup::ClassGroup;
 use k256::Scalar;
 use k256::elliptic_curve::Field; 
 use num_bigint::{BigInt, Sign};
-use num_traits::One;
+use num_traits::{Zero, One};
 use sha2::{Sha256, Digest};
 use rand::rngs::OsRng;
 

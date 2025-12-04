@@ -4,3 +4,11 @@ members = [
     "multi_party_ecdsa",
     "classgroup",
 ]
+
+# Optimize dependencies even in debug builds for better performance
+[profile.dev.package."*"]
+opt-level = 3
+
+# Keep our code unoptimized for faster compilation and better debugging
+[profile.dev]
+opt-level = 0

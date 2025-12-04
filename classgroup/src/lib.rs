@@ -179,6 +179,7 @@ mod test {
         path::PathBuf,
     };
 
+    use num_traits::Zero;
     use super::gmp::mpz::Mpz;
     use super::{gmp_classgroup::GmpClassGroup, ClassGroup};
 

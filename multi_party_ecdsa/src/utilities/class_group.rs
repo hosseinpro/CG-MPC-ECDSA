@@ -5,7 +5,7 @@ use k256::Scalar;
 use k256::elliptic_curve::PrimeField;
 use k256::elliptic_curve::Field;
 use num_bigint::{BigInt, Sign, RandBigInt};
-use num_traits::{Zero, Num};
+use num_traits::{Zero, One, Num};
 use lazy_static::lazy_static;
 use std::str::FromStr;
 use rand::rngs::OsRng;
