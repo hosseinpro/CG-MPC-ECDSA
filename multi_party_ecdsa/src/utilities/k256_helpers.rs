@@ -1,21 +1,22 @@
 use k256::{ProjectivePoint, AffinePoint, Scalar};
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use k256::elliptic_curve::{Field, PrimeField};
-use num_bigint::{BigInt, Sign, RandBigInt};
+use classgroup::{Mpz, MpzSign};
+use num_traits::{Zero, One};
 use sha2::{Sha256, Digest};
 use rand::rngs::OsRng;
 
 // Serialization helpers for Scalar
 
 pub trait ProjectivePointExt {
-    fn bytes_compressed_to_big_int(&self) -> BigInt;
+    fn bytes_compressed_to_big_int(&self) -> Mpz;
 }
 
 impl ProjectivePointExt for ProjectivePoint {
-    fn bytes_compressed_to_big_int(&self) -> BigInt {
+    fn bytes_compressed_to_big_int(&self) -> Mpz {
         let affine: AffinePoint = self.to_affine();
         let encoded = affine.to_encoded_point(true);
-        BigInt::from_bytes_be(Sign::Plus, encoded.as_bytes())
+        Mpz::from_bytes_be(MpzSign::Plus, encoded.as_bytes())
     }
 }
 
@@ -75,17 +76,19 @@ impl DLogProof<ProjectivePoint> {
 }
 
 // Hash commitment helper
-pub fn create_hash_commitment(message: &BigInt, blind_factor: &BigInt) -> BigInt {
+pub fn create_hash_commitment(message: &Mpz, blind_factor: &Mpz) -> Mpz {
     let mut hasher = Sha256::new();
     let (_, msg_bytes) = message.to_bytes_be();
     hasher.update(&msg_bytes);
     let (_, blind_bytes) = blind_factor.to_bytes_be();
     hasher.update(&blind_bytes);
     let hash = hasher.finalize();
-    BigInt::from_bytes_be(Sign::Plus, &hash)
+    Mpz::from_bytes_be(MpzSign::Plus, &hash)
 }
 
-pub fn sample_bigint(bits: usize) -> BigInt {
+pub fn sample_bigint(bits: usize) -> Mpz {
     let mut rng = OsRng;
-    rng.gen_bigint(bits as u64)
+    let lower = Mpz::zero();
+    let upper = Mpz::one() << bits;
+    Mpz::gen_range(&mut rng, &lower, &upper)
 }

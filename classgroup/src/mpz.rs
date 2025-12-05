@@ -629,6 +629,14 @@ impl Rem for &Mpz {
     }
 }
 
+impl Rem<&Mpz> for Mpz {
+    type Output = Mpz;
+    
+    fn rem(self, other: &Mpz) -> Mpz {
+        &self % other
+    }
+}
+
 impl RemAssign for Mpz {
     fn rem_assign(&mut self, other: Mpz) {
         if other.is_zero() {
@@ -996,39 +1004,61 @@ impl Add<u64> for Mpz {
     }
 }
 
-// Conversions to/from num-bigint::BigInt for compatibility with multi_party_ecdsa
-impl From<num_bigint::BigInt> for Mpz {
-    fn from(bigint: num_bigint::BigInt) -> Self {
-        let (sign, bytes) = bigint.to_bytes_be();
-        let ubig = UBig::from_be_bytes(&bytes);
+// Random number generation support
+impl Mpz {
+    /// Generate a random Mpz in the range [lower, upper)
+    pub fn gen_range<R: rand::Rng>(rng: &mut R, lower: &Mpz, upper: &Mpz) -> Mpz {
+        use dashu_int::rand::UniformIBig;
+        use rand::distributions::uniform::UniformSampler;
+        
+        let dist = UniformIBig::new(lower.inner.clone(), upper.inner.clone());
+        Mpz {
+            inner: dist.sample(rng),
+        }
+    }
+    
+    /// Parse bytes in big-endian format with a sign
+    pub fn from_bytes_be(sign: MpzSign, bytes: &[u8]) -> Mpz {
+        let ubig = UBig::from_be_bytes(bytes);
         let ibig = match sign {
-            num_bigint::Sign::Plus | num_bigint::Sign::NoSign => IBig::from(ubig),
-            num_bigint::Sign::Minus => -IBig::from(ubig),
+            MpzSign::Plus | MpzSign::NoSign => IBig::from(ubig),
+            MpzSign::Negative => -IBig::from(ubig),
         };
         Mpz { inner: ibig }
     }
-}
-
-impl From<&num_bigint::BigInt> for Mpz {
-    fn from(bigint: &num_bigint::BigInt) -> Self {
-        Mpz::from(bigint.clone())
-    }
-}
-
-impl From<Mpz> for num_bigint::BigInt {
-    fn from(mpz: Mpz) -> Self {
-        let (sign, ubig) = mpz.inner.into_parts();
-        let bytes = ubig.to_be_bytes();
-        let bigint_sign = match sign {
-            Sign::Positive => num_bigint::Sign::Plus,
-            Sign::Negative => num_bigint::Sign::Minus,
+    
+    /// Convert to bytes in big-endian format, returning (sign, bytes)
+    pub fn to_bytes_be(&self) -> (MpzSign, Vec<u8>) {
+        let (sign, ubig) = self.inner.clone().into_parts();
+        let bytes = ubig.to_be_bytes().to_vec();
+        let mpz_sign = match sign {
+            Sign::Positive => if bytes.is_empty() || bytes.iter().all(|&b| b == 0) {
+                MpzSign::NoSign
+            } else {
+                MpzSign::Plus
+            },
+            Sign::Negative => MpzSign::Negative,
         };
-        num_bigint::BigInt::from_bytes_be(bigint_sign, &bytes)
+        (mpz_sign, bytes)
+    }
+    
+    /// Parse from string with radix
+    pub fn parse_bytes(s: &[u8], radix: u32) -> Option<Mpz> {
+        let s_str = std::str::from_utf8(s).ok()?;
+        Mpz::from_str_radix(s_str, radix as u8).ok()
+    }
+    
+    pub fn pow(&self, exp: u32) -> Mpz {
+        Mpz {
+            inner: self.inner.pow(exp as usize),
+        }
     }
 }
 
-impl From<&Mpz> for num_bigint::BigInt {
-    fn from(mpz: &Mpz) -> Self {
-        mpz.clone().into()
-    }
+// Sign enum compatible with what multi_party_ecdsa expects
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MpzSign {
+    Negative,
+    NoSign,
+    Plus,
 }

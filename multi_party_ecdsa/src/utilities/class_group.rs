@@ -1,17 +1,14 @@
 use classgroup::classgroup::*;
-use classgroup::{ClassGroup, Mpz};
+use classgroup::{ClassGroup, Mpz, MpzSign};
 use k256::Scalar;
 use k256::elliptic_curve::PrimeField;
-use k256::elliptic_curve::Field;
-use num_bigint::{BigInt, Sign, RandBigInt};
-use num_traits::{Zero, One, Num};
+use num_traits::{Zero, One};
 use lazy_static::lazy_static;
 use std::str::FromStr;
 use rand::rngs::OsRng;
 
 lazy_static! {
-    static ref Q_BIGINT: BigInt = BigInt::from_str("115792089237316195423570985008687907852837564279074904382605163141518161494337").unwrap();
-    static ref Q_MPZ: Mpz = Mpz::from(Q_BIGINT.clone());
+    static ref Q_MPZ: Mpz = Mpz::from_str("115792089237316195423570985008687907852837564279074904382605163141518161494337").unwrap();
 }
 
 #[derive(Clone, Debug)]
@@ -84,8 +81,8 @@ impl CLGroup {
     }
 
     pub fn keygen(&self) -> (SK, PK) {
-        let upper = &mpz_to_bigint(&self.stilde) * BigInt::from(2i32).pow(40);
-        let sk = SK(bigint_to_mpz(sample_below(&upper)));
+        let upper = self.stilde.clone() * (Mpz::one() << 40);
+        let sk = SK(sample_below(&upper));
         let mut generator = self.gq.clone();
         generator.pow(sk.clone().0);
         let pk = PK(generator);
@@ -118,15 +115,13 @@ impl CLGroup {
         let q_val = q();
         let plaintext = discrete_log_f(&q_val, &group.gq.discriminant(), &tmp);
         debug_assert!(plaintext < q_val);
-        let plaintext_big = BigInt::from(&plaintext);
-        scalar_from_bigint(&plaintext_big)
+        scalar_from_mpz(&plaintext)
     }
 
     pub fn encrypt_without_r(group: &CLGroup, m: &Scalar) -> (Ciphertext, SK) {
         let r = SK::from(Mpz::from(0));
         let r_big = group.pk_for_sk(r.clone());
-        let m_bigint = scalar_to_bigint(m);
-        let m_mpz = bigint_to_mpz(m_bigint);
+        let m_mpz = into_mpz(m);
         let q_val = q();
         let exp_f = expo_f(&q_val, &group.gq.discriminant(), &m_mpz);
 
@@ -167,17 +162,16 @@ pub fn q() -> Mpz {
     Q_MPZ.clone()
 }
 
-pub fn scalar_to_bigint(s: &Scalar) -> BigInt {
+pub fn scalar_to_mpz(s: &Scalar) -> Mpz {
     let bytes = s.to_bytes();
-    BigInt::from_bytes_be(Sign::Plus, &bytes)
+    Mpz::from_bytes_be(MpzSign::Plus, &bytes)
 }
 
-pub fn scalar_from_bigint(b: &BigInt) -> Scalar {
-    let (sign, mut bytes) = b.to_bytes_be();
-    if sign == Sign::Minus {
+pub fn scalar_from_mpz(mpz: &Mpz) -> Scalar {
+    let (sign, mut bytes) = mpz.to_bytes_be();
+    if sign == MpzSign::Negative {
         // For negative numbers, we need to compute modulo the curve order
-        // For now, just wrap around
-        let positive = (b % &*Q_BIGINT + &*Q_BIGINT) % &*Q_BIGINT;
+        let positive = (mpz % &*Q_MPZ + &*Q_MPZ) % &*Q_MPZ;
         let (_, pos_bytes) = positive.to_bytes_be();
         bytes = pos_bytes;
     }
@@ -190,16 +184,16 @@ pub fn scalar_from_bigint(b: &BigInt) -> Scalar {
     Scalar::from_repr(arr.into()).unwrap_or(Scalar::ZERO)
 }
 
-pub fn sample_below(upper: &BigInt) -> BigInt {
+pub fn sample_below(upper: &Mpz) -> Mpz {
     let mut rng = OsRng;
-    rng.gen_bigint_range(&BigInt::zero(), upper)
+    Mpz::gen_range(&mut rng, &Mpz::zero(), upper)
 }
 
-pub fn mod_add(a: &BigInt, b: &BigInt, modulus: &BigInt) -> BigInt {
+pub fn mod_add(a: &Mpz, b: &Mpz, modulus: &Mpz) -> Mpz {
     (a + b) % modulus
 }
 
-pub fn mod_floor(a: &BigInt, modulus: &BigInt) -> BigInt {
+pub fn mod_floor(a: &Mpz, modulus: &Mpz) -> Mpz {
     ((a % modulus) + modulus) % modulus
 }
 
@@ -236,17 +230,8 @@ pub fn discrete_log_f(p: &Mpz, delta: &Mpz, c: &GmpClassGroup) -> Mpz {
     }
 }
 
-pub fn mpz_to_bigint<T: Into<BigInt>>(value: T) -> BigInt {
-    value.into()
-}
-
-pub fn bigint_to_mpz<T: Into<Mpz>>(value: T) -> Mpz {
-    value.into()
-}
-
 pub fn into_mpz(f: &Scalar) -> Mpz {
-    let bigint = scalar_to_bigint(f);
-    bigint_to_mpz(bigint)
+    scalar_to_mpz(f)
 }
 
 lazy_static! {
@@ -299,11 +284,12 @@ lazy_static! {
 
 #[test]
 pub fn test_encrypt_decrypt() {
+    use k256::elliptic_curve::Field;
     let m = Scalar::random(&mut OsRng);
     let (sk, pk) = GROUP_128.keygen();
     let c = CLGroup::encrypt(&GROUP_128, &pk, &m);
     let m_new = CLGroup::decrypt(&GROUP_128, &sk, &c.0);
-    assert_eq!(scalar_to_bigint(&m), scalar_to_bigint(&m_new));
+    assert_eq!(scalar_to_mpz(&m), scalar_to_mpz(&m_new));
 }
 
 // #[test]
@@ -329,9 +315,9 @@ pub fn pow_a() {
 
 #[test]
 fn test_big_to_mpz() {
-    let a = BigInt::from_str_radix("123", 16).unwrap();
+    let a = Mpz::parse_bytes(b"123", 16).unwrap();
     let start = time::now();
-    let _b = bigint_to_mpz(a);
+    let _b = a.clone();
     let end = time::now();
     println!("duration = {:?}", end - start);
 }

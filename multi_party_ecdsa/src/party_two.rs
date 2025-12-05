@@ -4,8 +4,8 @@ use crate::utilities::error::MulEcdsaError;
 use crate::utilities::k256_helpers::DLogProof;
 use k256::{Scalar, ProjectivePoint};
 use k256::elliptic_curve::Field;
-use crate::utilities::class_group::scalar_from_bigint;
-use num_bigint::BigInt;
+use crate::utilities::class_group::scalar_from_mpz;
+use classgroup::{Mpz, MpzSign};
 use rand::rngs::OsRng;
 
 #[derive(Clone, Debug)]
@@ -36,9 +36,9 @@ impl Sign {
         let nonce_public_share = ProjectivePoint::GENERATOR * nonce_secret_share;
         let dl_com_zk_com = DLComZK::new(&nonce_secret_share, &nonce_public_share);
         
-        // Process the message to sign - convert bytes to BigInt
-        let message_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, message_bytes);
-        let message = scalar_from_bigint(&message_bigint);
+        // Process the message to sign - convert bytes to Mpz
+        let message_mpz = Mpz::from_bytes_be(MpzSign::Plus, message_bytes);
+        let message = scalar_from_mpz(&message_mpz);
         let ret = Self {
             nonce_secret_share,
             nonce_public_share,
@@ -97,9 +97,9 @@ impl Sign {
         let affine = r.to_affine();
         let encoded = affine.to_encoded_point(false);
         let x_bytes = encoded.x().ok_or("get x coor failed")?;
-        let x_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, x_bytes);
+        let x_mpz = Mpz::from_bytes_be(MpzSign::Plus, x_bytes);
         
-        self.r_x = scalar_from_bigint(&x_bigint);
+        self.r_x = scalar_from_mpz(&x_mpz);
         Ok(self.dl_com_zk_com.witness.clone())
     }
 
@@ -110,8 +110,8 @@ impl Sign {
     }
 
     pub fn set_msg(&mut self, message_bytes: &[u8]) -> Result<(), MulEcdsaError> {
-        let message_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, message_bytes);
-        let message: Scalar = scalar_from_bigint(&message_bigint);
+        let message_mpz = Mpz::from_bytes_be(MpzSign::Plus, message_bytes);
+        let message: Scalar = scalar_from_mpz(&message_mpz);
         self.message = message;
         self.msg_set = true;
         Ok(())

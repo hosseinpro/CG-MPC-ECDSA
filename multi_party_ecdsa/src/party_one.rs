@@ -4,10 +4,9 @@ use crate::utilities::error::MulEcdsaError;
 use crate::utilities::k256_helpers::DLogProof;
 use k256::{Scalar, ProjectivePoint};
 use k256::elliptic_curve::Field;
-use crate::utilities::class_group::{scalar_to_bigint, scalar_from_bigint};
-use num_bigint::BigInt;
+use crate::utilities::class_group::{scalar_to_mpz, scalar_from_mpz};
+use classgroup::MpzSign;
 use rand::rngs::OsRng;
-use std::cmp;
 
 #[derive(Clone, Debug)]
 pub struct KeyGenResult {
@@ -48,9 +47,10 @@ impl Sign {
         let reshared_secret_share = Scalar::random(&mut OsRng);
         let reshared_public_share = ProjectivePoint::GENERATOR * reshared_secret_share;
         
-        // Process the message to sign - convert bytes to BigInt
-        let message_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, message_bytes);
-        let message = scalar_from_bigint(&message_bigint);
+        // Process the message to sign - convert bytes to Mpz
+        use classgroup::Mpz;
+        let message_mpz = Mpz::from_bytes_be(MpzSign::Plus, message_bytes);
+        let message = scalar_from_mpz(&message_mpz);
         
         let nonce_secret_share = Scalar::random(&mut OsRng);
         let nonce_public_share = ProjectivePoint::GENERATOR * nonce_secret_share;
@@ -106,27 +106,30 @@ impl Sign {
         
         // Get x-coordinate
         use k256::elliptic_curve::sec1::ToEncodedPoint;
+        use classgroup::Mpz;
         let affine = r.to_affine();
         let encoded = affine.to_encoded_point(false);
         let x_bytes = encoded.x().ok_or(MulEcdsaError::XcoorNone)?;
-        let x_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, x_bytes);
+        let x_mpz = Mpz::from_bytes_be(MpzSign::Plus, x_bytes);
         
-        self.r_x = scalar_from_bigint(&x_bigint);
+        self.r_x = scalar_from_mpz(&x_mpz);
         Ok(())
     }
 
     pub fn online_sign(&self, s2_rec: &Scalar) -> Result<Signature, MulEcdsaError> {
+        use classgroup::Mpz;
+        use std::cmp;
         let s_tag = self.nonce_secret_share.invert().unwrap_or(Scalar::ZERO)
             * (*s2_rec + self.r_x * self.reshared_secret_share);
         
         // secp256k1 order
-        let q = BigInt::parse_bytes(b"115792089237316195423570985008687907852837564279074904382605163141518161494337", 10).unwrap();
-        let s_tag_bigint = scalar_to_bigint(&s_tag);
-        let s = cmp::min(s_tag_bigint.clone(), &q - &s_tag_bigint);
+        let q = Mpz::parse_bytes(b"115792089237316195423570985008687907852837564279074904382605163141518161494337", 10).unwrap();
+        let s_tag_mpz = scalar_to_mpz(&s_tag);
+        let s = cmp::min(s_tag_mpz.clone(), &q - &s_tag_mpz);
         
         let signature = Signature {
             r: self.r_x,
-            s: scalar_from_bigint(&s),
+            s: scalar_from_mpz(&s),
         };
         signature.verify(
             &self.keygen_result.clone().unwrap().public_signing_key,

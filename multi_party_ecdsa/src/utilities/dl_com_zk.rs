@@ -2,18 +2,17 @@ use crate::utilities::error::MulEcdsaError;
 use crate::utilities::SECURITY_BITS;
 use crate::utilities::k256_helpers::*;
 use k256::{ProjectivePoint, Scalar};
-use num_bigint::BigInt;
-use num_traits::Zero;
+use classgroup::Mpz;
 
 #[derive(Clone, Debug)]
 pub struct DlogCommitment {
-    pub commitment: BigInt,
+    pub commitment: Mpz,
     pub open: DlogCommitmentOpen,
 }
 
 #[derive(Clone, Debug)]
 pub struct DlogCommitmentOpen {
-    pub blind_factor: BigInt,
+    pub blind_factor: Mpz,
     pub public_share: ProjectivePoint,
 }
 
@@ -25,14 +24,14 @@ pub struct DLComZK {
 
 #[derive(Clone, Debug)]
 pub struct DLCommitments {
-    pub pk_commitment: BigInt,
-    pub zk_pok_commitment: BigInt,
+    pub pk_commitment: Mpz,
+    pub zk_pok_commitment: Mpz,
 }
 
 #[derive(Clone, Debug)]
 pub struct CommWitness {
-    pub pk_commitment_blind_factor: BigInt,
-    pub zk_pok_blind_factor: BigInt,
+    pub pk_commitment_blind_factor: Mpz,
+    pub zk_pok_blind_factor: Mpz,
     pub public_share: ProjectivePoint,
     pub d_log_proof: DLogProof<ProjectivePoint>,
 }
@@ -67,7 +66,7 @@ impl DlogCommitment {
     }
 
     pub fn verify_dlog(
-        commitment: &BigInt,
+        commitment: &Mpz,
         open: &DlogCommitmentOpen,
     ) -> Result<(), MulEcdsaError> {
         if create_hash_commitment(
@@ -191,8 +190,8 @@ impl CommWitness {
 impl Default for DLCommitments {
     fn default() -> DLCommitments {
         DLCommitments {
-            pk_commitment: BigInt::zero(),
-            zk_pok_commitment: BigInt::zero(),
+            pk_commitment: Mpz::new(),
+            zk_pok_commitment: Mpz::new(),
         }
     }
 }

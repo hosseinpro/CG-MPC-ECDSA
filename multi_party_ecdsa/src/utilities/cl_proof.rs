@@ -2,10 +2,9 @@ use crate::utilities::class_group::*;
 use crate::utilities::error::MulEcdsaError;
 use crate::utilities::SECURITY_PARAMETER;
 use classgroup::classgroup::*;
-use classgroup::{ClassGroup, Mpz};
+use classgroup::{ClassGroup, Mpz, MpzSign};
 use k256::Scalar;
-use k256::elliptic_curve::Field; 
-use num_bigint::{BigInt, Sign};
+use k256::elliptic_curve::Field;
 use num_traits::{Zero, One};
 use sha2::{Sha256, Digest};
 use rand::rngs::OsRng;
@@ -32,39 +31,38 @@ pub struct CLProof {
 
 impl CLProof {
     pub fn prove(group: &CLGroup, witness: CLWit, statement: CLState) -> Self {
-        let upper = &mpz_to_bigint(&group.stilde)
-            * BigInt::from(2i32).pow(40)
-            * BigInt::from(2i32).pow(SECURITY_PARAMETER as u32)
-            * BigInt::from(2i32).pow(40);
+        let upper = group.stilde.clone()
+            * (Mpz::one() << 40)
+            * (Mpz::one() << SECURITY_PARAMETER)
+            * (Mpz::one() << 40);
         let r1 = sample_below(&upper);
-        let r1_mpz = bigint_to_mpz(r1);
         let r2_fe = Scalar::random(&mut OsRng);
         let r2 = into_mpz(&r2_fe);
         let fr2 = expo_f(&q(), &group.gq.discriminant(), &r2);
         let mut pkr1 = statement.cl_pub_key.0.clone();
-        pkr1.pow(r1_mpz.clone());
+        pkr1.pow(r1.clone());
         let t2 = fr2 * pkr1;
         let mut t1 = group.gq.clone();
-        t1.pow(r1_mpz.clone());
+        t1.pow(r1.clone());
         let k = Self::challenge(
             &statement.cl_pub_key,
             t1.clone(),
             t2.clone(),
             &statement.cipher,
         );
-        let u1 = r1_mpz + &bigint_to_mpz(k.clone()) * &witness.r.0;
-        let q_bigint = mpz_to_bigint(q());
+        let u1 = r1 + &k * &witness.r.0;
+        let q_val = q();
         let u2 = mod_add(
-            &mpz_to_bigint(&r2),
-            &(&k * scalar_to_bigint(&witness.x)),
-            &q_bigint,
+            &r2,
+            &(&k * &scalar_to_mpz(&witness.x)),
+            &q_val,
         );
 
         Self {
             t1,
             t2,
             u1,
-            u2: bigint_to_mpz(u2),
+            u2,
         }
     }
 
@@ -74,7 +72,7 @@ impl CLProof {
         t1: GmpClassGroup,
         t2: GmpClassGroup,
         ciphertext: &Ciphertext,
-    ) -> BigInt {
+    ) -> Mpz {
         let mut hasher = Sha256::new();
         hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&ciphertext.c1.to_bytes()));
         hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&ciphertext.c2.to_bytes()));
@@ -84,7 +82,7 @@ impl CLProof {
         let hash256 = hasher.finalize();
 
         let hash128 = &hash256[..SECURITY_PARAMETER / 8];
-        BigInt::from_bytes_be(Sign::Plus, hash128)
+        Mpz::from_bytes_be(MpzSign::Plus, hash128)
     }
 
     pub fn verify(&self, group: &CLGroup, statement: CLState) -> Result<(), MulEcdsaError> {
@@ -98,13 +96,13 @@ impl CLProof {
             &statement.cipher,
         );
 
-        let sample_size = &mpz_to_bigint(&group.stilde)
-            * BigInt::from(2i32).pow(40)
-            * BigInt::from(2i32).pow(SECURITY_PARAMETER as u32)
-            * (BigInt::from(2i32).pow(40) + BigInt::one());
+        let sample_size = group.stilde.clone()
+            * (Mpz::one() << 40)
+            * (Mpz::one() << SECURITY_PARAMETER)
+            * ((Mpz::one() << 40) + Mpz::one());
 
         //length test u1:
-        if &self.u1 > &bigint_to_mpz(sample_size) || &self.u1 < &Mpz::zero() {
+        if &self.u1 > &sample_size || &self.u1 < &Mpz::zero() {
             flag = false;
         }
         // length test u2:
@@ -114,7 +112,7 @@ impl CLProof {
         }
 
         let mut c1k = statement.cipher.c1;
-        c1k.pow(bigint_to_mpz(k.clone()));
+        c1k.pow(k.clone());
         let t1c1k = self.t1.clone() * c1k;
         let mut gqu1 = group.gq.clone();
         gqu1.pow(self.u1.clone());
@@ -126,7 +124,7 @@ impl CLProof {
         pku1.pow(self.u1.clone());
         let fu2 = expo_f(&q_val, &group.gq.discriminant(), &self.u2);
         let mut c2k = statement.cipher.c2;
-        c2k.pow(bigint_to_mpz(k));
+        c2k.pow(k);
         let t2c2k = self.t2.clone() * c2k;
         let pku1fu2 = pku1 * fu2;
         if t2c2k != pku1fu2 {

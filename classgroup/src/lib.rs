@@ -7,6 +7,7 @@ mod congruence;
 pub mod classgroup;
 
 pub use self::mpz::Mpz;
+pub use self::mpz::MpzSign;
 pub use self::mpz_ops::{export_obj, import_obj};
 pub use self::classgroup::{do_compute, GmpClassGroup};
 
