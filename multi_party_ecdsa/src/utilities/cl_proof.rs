@@ -7,7 +7,6 @@ use classgroup::ClassGroup;
 use k256::Scalar;
 use k256::elliptic_curve::Field; 
 use num_bigint::{BigInt, Sign};
-use num_traits::One;
 use sha2::{Sha256, Digest};
 use rand::rngs::OsRng;
 
@@ -102,14 +101,14 @@ impl CLProof {
         let sample_size = &mpz_to_bigint(group.stilde.clone())
             * BigInt::from(2i32).pow(40)
             * BigInt::from(2i32).pow(SECURITY_PARAMETER as u32)
-            * (BigInt::from(2i32).pow(40) + BigInt::one());
+            * (BigInt::from(2i32).pow(40) + BigInt::from(1));
 
         //length test u1:
-        if &self.u1 > &bigint_to_mpz(sample_size) || &self.u1 < &Mpz::zero() {
+        if &self.u1 > &bigint_to_mpz(sample_size) || &self.u1 < &Mpz::from(0) {
             flag = false;
         }
         // length test u2:
-        if &self.u2 > &q() || &self.u2 < &Mpz::zero() {
+        if &self.u2 > &q() || &self.u2 < &Mpz::from(0) {
             flag = false;
         }
 

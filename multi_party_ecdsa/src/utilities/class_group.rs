@@ -4,13 +4,13 @@ use classgroup::ClassGroup;
 use k256::Scalar;
 use k256::elliptic_curve::PrimeField;
 use num_bigint::{BigInt, Sign, RandBigInt};
-use num_traits::{Zero, Num};
-use lazy_static::lazy_static;
 use std::str::FromStr;
 use rand::rngs::OsRng;
 
 #[cfg(test)]
 use k256::elliptic_curve::Field;
+
+use lazy_static::lazy_static;
 
 #[derive(Clone, Debug)]
 pub struct CLGroup {
@@ -114,7 +114,7 @@ impl CLGroup {
         let tmp = c.c2.clone() * &c1_x_inv;
         let plaintext = discrete_log_f(&q(), &group.gq.discriminant(), &tmp);
         debug_assert!(plaintext < q());
-        let plaintext_big = BigInt::from_str_radix(&plaintext.to_str_radix(16), 16).unwrap();
+        let plaintext_big = mpz_to_bigint(plaintext);
         scalar_from_bigint(&plaintext_big)
     }
 
@@ -190,7 +190,7 @@ pub fn scalar_from_bigint(b: &BigInt) -> Scalar {
 
 pub fn sample_below(upper: &BigInt) -> BigInt {
     let mut rng = OsRng;
-    rng.gen_bigint_range(&BigInt::zero(), upper)
+    rng.gen_bigint_range(&BigInt::from(0), upper)
 }
 
 pub fn mod_add(a: &BigInt, b: &BigInt, modulus: &BigInt) -> BigInt {
@@ -202,20 +202,20 @@ pub fn mod_floor(a: &BigInt, modulus: &BigInt) -> BigInt {
 }
 
 pub fn from_discriminant(delta: &Mpz) -> GmpClassGroup {
-    let a = Mpz::one();
-    let b = Mpz::one();
-    assert_eq!(delta.mod_floor(&Mpz::from(4)), Mpz::one());
-    assert!(delta < &Mpz::zero()); // in general delta can be positive but we don't deal with that case
+    let a = Mpz::from(1);
+    let b = Mpz::from(1);
+    assert_eq!(delta.mod_floor(&Mpz::from(4)), Mpz::from(1));
+    assert!(delta < &Mpz::from(0)); // in general delta can be positive but we don't deal with that case
     ClassGroup::from_ab_discriminant(a, b, (*delta).clone())
 }
 
 pub fn expo_f(p: &Mpz, delta: &Mpz, k: &Mpz) -> GmpClassGroup {
-    if k == &Mpz::zero() {
+    if k == &Mpz::from(0) {
         let group = from_discriminant(delta);
         return group;
     }
     let mut k_inv = k.invert(p).unwrap();
-    if k_inv.mod_floor(&Mpz::from(2)) == Mpz::zero() {
+    if k_inv.mod_floor(&Mpz::from(2)) == Mpz::from(0) {
         k_inv = k_inv - p;
     };
     let k_inv_p = k_inv * p;
@@ -226,7 +226,7 @@ pub fn expo_f(p: &Mpz, delta: &Mpz, k: &Mpz) -> GmpClassGroup {
 pub fn discrete_log_f(p: &Mpz, delta: &Mpz, c: &GmpClassGroup) -> Mpz {
     let principal_qf = from_discriminant(delta);
     if c == &principal_qf {
-        return Mpz::zero();
+        return Mpz::from(0);
     } else {
         let lk = c.b.div_floor(p);
         let lk_inv = lk.invert(p).unwrap();
@@ -235,7 +235,20 @@ pub fn discrete_log_f(p: &Mpz, delta: &Mpz, c: &GmpClassGroup) -> Mpz {
 }
 
 pub fn mpz_to_bigint(value: Mpz) -> BigInt {
-    BigInt::from_str_radix(&value.to_str_radix(16), 16).unwrap()
+    let hex_str = value.to_str_radix(16);
+    let is_negative = hex_str.starts_with('-');
+    let hex_part = hex_str.trim_start_matches('-');
+    
+    // Pad with leading zero if odd length
+    let padded_hex = if hex_part.len() % 2 == 1 {
+        format!("0{}", hex_part)
+    } else {
+        hex_part.to_string()
+    };
+    
+    let bytes = hex::decode(&padded_hex).unwrap();
+    let sign = if is_negative { Sign::Minus } else { Sign::Plus };
+    BigInt::from_bytes_be(sign, &bytes)
 }
 
 pub fn bigint_to_mpz(value: BigInt) -> Mpz {
@@ -333,7 +346,7 @@ pub fn pow_a() {
 
 #[test]
 fn test_big_to_mpz() {
-    let a = BigInt::from_str_radix("123", 16).unwrap();
+    let a = BigInt::from(0x123);
     let start = std::time::Instant::now();
     let _b = bigint_to_mpz(a);
     let duration = start.elapsed();

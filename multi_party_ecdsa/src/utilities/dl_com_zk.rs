@@ -3,7 +3,6 @@ use crate::utilities::SECURITY_BITS;
 use crate::utilities::k256_helpers::*;
 use k256::{ProjectivePoint, Scalar};
 use num_bigint::BigInt;
-use num_traits::Zero;
 
 #[derive(Clone, Debug)]
 pub struct DlogCommitment {
@@ -191,8 +190,8 @@ impl CommWitness {
 impl Default for DLCommitments {
     fn default() -> DLCommitments {
         DLCommitments {
-            pk_commitment: BigInt::zero(),
-            zk_pok_commitment: BigInt::zero(),
+            pk_commitment: BigInt::ZERO,
+            zk_pok_commitment: BigInt::ZERO,
         }
     }
 }
