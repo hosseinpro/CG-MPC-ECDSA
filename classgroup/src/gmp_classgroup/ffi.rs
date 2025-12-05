@@ -207,18 +207,6 @@ pub fn mpz_fdiv_q(q: &mut Mpz, n: &Mpz, d: &Mpz) {
     }
 }
 
-/// Sets `rop` to `(-1) * op`
-#[inline]
-#[cfg(none)]
-pub fn mpz_neg(rop: &mut Mpz) {
-    assert!(mem::size_of::<Mpz>() == mem::size_of::<MpzStruct>());
-    unsafe {
-        let ptr = rop as *mut _ as *mut MpzStruct;
-        let v = (*ptr).mp_size;
-        (*ptr).mp_size = -v;
-    }
-}
-
 /// Subtracts `op2` from `op1` and stores the result in `rop`.
 #[inline]
 pub fn mpz_sub(rop: &mut Mpz, op1: &Mpz, op2: &Mpz) {
