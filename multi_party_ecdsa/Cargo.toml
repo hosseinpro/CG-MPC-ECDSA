@@ -2,26 +2,12 @@
 name = "multi-party-ecdsa"
 version = "0.1.0"
 edition = "2018"
-authors = [
-    "songxuyang <xuyangsong1012@gmail.com>",
-    "wanghailong",
-    "wangxueli <snowdawn16@gmail.com>" 
-]
-keywords = [
-    "ecdsa",
-    "multi-party-ecdsa",
-    "signature",
-    "rust",
-    "secret-shares",
-    "cryptography",
-]
 
 [lib]
 crate-type= ["lib"]
 
 [dependencies]
 classgroup = {path = "../classgroup"}
-time = "0.1"
 hex = "0.4"
 rand = "0.8"
 thiserror = "1"

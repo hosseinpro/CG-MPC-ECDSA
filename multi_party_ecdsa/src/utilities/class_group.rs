@@ -325,17 +325,17 @@ pub fn test_encrypt_decrypt() {
 pub fn pow_a() {
     let mut a = GROUP_128.gq.clone();
     let b = Mpz::from_str_radix("123", 10).unwrap();
-    let start = time::now();
+    let start = std::time::Instant::now();
     a.pow(b);
-    let end = time::now();
-    println!("time = {:?}", end - start);
+    let duration = start.elapsed();
+    println!("time = {:?}", duration);
 }
 
 #[test]
 fn test_big_to_mpz() {
     let a = BigInt::from_str_radix("123", 16).unwrap();
-    let start = time::now();
+    let start = std::time::Instant::now();
     let _b = bigint_to_mpz(a);
-    let end = time::now();
-    println!("duration = {:?}", end - start);
+    let duration = start.elapsed();
+    println!("duration = {:?}", duration);
 }
