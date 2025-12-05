@@ -10,7 +10,6 @@ crate-type= ["lib"]
 classgroup = {path = "../classgroup"}
 hex = "0.4"
 rand = "0.8"
-thiserror = "1"
 k256 = { version = "0.11", features = ["arithmetic", "ecdsa"] }
 lazy_static = "1.4.0"
 sha2 = "0.10"
