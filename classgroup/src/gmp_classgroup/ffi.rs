@@ -24,7 +24,7 @@ pub use super::super::gmp::mpz::Mpz;
 use super::super::gmp::mpz::{mp_bitcnt_t, mp_limb_t};
 use libc::{c_int, c_long, c_ulong, c_void, size_t};
 // pub use c_ulong;
-use std::{mem, usize};
+use std::{mem::MaybeUninit, usize};
 // We use the unsafe versions to avoid unecessary allocations.
 #[link(name = "gmp")]
 extern "C" {
@@ -227,8 +227,9 @@ pub fn export_obj(obj: &Mpz, v: &mut [u8]) -> Result<(), usize> {
         *(ptr as *mut u8) = 0;
 
         // SAFE as __gmpz_export will *always* initialize this.
-        let mut s: usize = mem::uninitialized();
-        let ptr2 = __gmpz_export(ptr, &mut s, 1, 1, 1, 0, obj);
+        let mut s = MaybeUninit::uninit();
+        let ptr2 = __gmpz_export(ptr, s.as_mut_ptr(), 1, 1, 1, 0, obj);
+        let s = s.assume_init();
         assert_eq!(ptr, ptr2);
         if 0 == s {
             1

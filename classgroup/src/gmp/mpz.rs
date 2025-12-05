@@ -8,7 +8,7 @@ use std::cmp::Ordering::{self, Equal, Greater, Less};
 use std::convert::From;
 use std::error::Error;
 use std::ffi::CString;
-use std::mem::{size_of, uninitialized};
+use std::mem::{size_of, MaybeUninit};
 use std::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
     Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
@@ -188,18 +188,18 @@ impl Mpz {
     #[inline]
     pub fn new() -> Mpz {
         unsafe {
-            let mut mpz = uninitialized();
-            __gmpz_init(&mut mpz);
-            Mpz { mpz: mpz }
+            let mut mpz = MaybeUninit::uninit();
+            __gmpz_init(mpz.as_mut_ptr());
+            Mpz { mpz: mpz.assume_init() }
         }
     }
 
     #[inline]
     pub fn new_reserve(n: usize) -> Mpz {
         unsafe {
-            let mut mpz = uninitialized();
-            __gmpz_init2(&mut mpz, n as c_ulong);
-            Mpz { mpz: mpz }
+            let mut mpz = MaybeUninit::uninit();
+            __gmpz_init2(mpz.as_mut_ptr(), n as c_ulong);
+            Mpz { mpz: mpz.assume_init() }
         }
     }
 
@@ -243,12 +243,12 @@ impl Mpz {
         let s = CString::new(s.to_string()).map_err(|_| ParseMpzError { _priv: () })?;
         unsafe {
             assert!(base == 0 || (base >= 2 && base <= 62));
-            let mut mpz = uninitialized();
-            let r = __gmpz_init_set_str(&mut mpz, s.as_ptr(), base as c_int);
+            let mut mpz = MaybeUninit::uninit();
+            let r = __gmpz_init_set_str(mpz.as_mut_ptr(), s.as_ptr(), base as c_int);
             if r == 0 {
-                Ok(Mpz { mpz: mpz })
+                Ok(Mpz { mpz: mpz.assume_init() })
             } else {
-                __gmpz_clear(&mut mpz);
+                __gmpz_clear(mpz.as_mut_ptr());
                 Err(ParseMpzError { _priv: () })
             }
         }
@@ -504,9 +504,9 @@ impl Mpz {
 
     pub fn one() -> Mpz {
         unsafe {
-            let mut mpz = uninitialized();
-            __gmpz_init_set_ui(&mut mpz, 1);
-            Mpz { mpz: mpz }
+            let mut mpz = MaybeUninit::uninit();
+            __gmpz_init_set_ui(mpz.as_mut_ptr(), 1);
+            Mpz { mpz: mpz.assume_init() }
         }
     }
 
@@ -543,9 +543,9 @@ impl Error for ParseMpzError {
 impl Clone for Mpz {
     fn clone(&self) -> Mpz {
         unsafe {
-            let mut mpz = uninitialized();
-            __gmpz_init_set(&mut mpz, &self.mpz);
-            Mpz { mpz: mpz }
+            let mut mpz = MaybeUninit::uninit();
+            __gmpz_init_set(mpz.as_mut_ptr(), &self.mpz);
+            Mpz { mpz: mpz.assume_init() }
         }
     }
 }

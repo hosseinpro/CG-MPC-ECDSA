@@ -3,12 +3,14 @@ use classgroup::gmp_classgroup::*;
 use classgroup::ClassGroup;
 use k256::Scalar;
 use k256::elliptic_curve::PrimeField;
-use k256::elliptic_curve::Field;
 use num_bigint::{BigInt, Sign, RandBigInt};
 use num_traits::{Zero, Num};
 use lazy_static::lazy_static;
 use std::str::FromStr;
 use rand::rngs::OsRng;
+
+#[cfg(test)]
+use k256::elliptic_curve::Field;
 
 #[derive(Clone, Debug)]
 pub struct CLGroup {
