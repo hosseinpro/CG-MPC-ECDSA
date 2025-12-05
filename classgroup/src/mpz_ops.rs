@@ -16,8 +16,8 @@ pub fn mpz_frem_u32(n: &Mpz, d: u32) -> u32 {
 /// returns `false`.
 #[inline]
 pub fn mpz_is_negative(z: &Mpz) -> bool {
-    use num_bigint::Sign;
-    z.sign() == Sign::Minus
+    use dashu_int::Sign;
+    z.sign() == Sign::Negative
 }
 
 #[inline]

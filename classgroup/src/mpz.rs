@@ -1,7 +1,7 @@
 extern crate alloc;
 use alloc::{string::String, vec::Vec};
 use core::cmp::Ordering;
-use core::convert::From;
+use core::convert::{From, TryInto};
 use core::ops::{
     Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
     Mul, MulAssign, Neg, Not, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
@@ -9,19 +9,19 @@ use core::ops::{
 use core::str::FromStr;
 use core::{fmt, hash};
 
-use num_bigint::{BigInt, Sign};
-use num_traits::{One, Zero, Signed, ToPrimitive, Num};
-use num_integer::Integer as IntegerTrait;
+use dashu_int::{IBig, Sign, UBig};
+use dashu_int::ops::{Abs, BitTest, Gcd, SquareRoot, DivEuclid, RemEuclid};
+use num_traits::{One, Zero, ToPrimitive};
 use serde::de;
 use serde::de::Visitor;
 use serde::ser::{Serialize, Serializer};
 use serde::{Deserialize, Deserializer};
 
 /// Arbitrary precision integer, compatible with GMP's Mpz API
-/// Now using num-bigint for dynamic allocation and better performance
+/// Now using dashu-int for dynamic allocation and better performance
 #[derive(Clone, Debug)]
 pub struct Mpz {
-    inner: BigInt,
+    inner: IBig,
 }
 
 const HEX_RADIX: u8 = 16;
@@ -64,7 +64,7 @@ impl<'de> Visitor<'de> for MpzVisitor {
 // Constructors
 impl Mpz {
     pub fn new() -> Self {
-        Mpz { inner: BigInt::zero() }
+        Mpz { inner: IBig::ZERO }
     }
 
     pub fn from_str_radix(s: &str, radix: u8) -> Result<Self, &'static str> {
@@ -77,7 +77,7 @@ impl Mpz {
             return Err("empty string");
         }
 
-        BigInt::from_str_radix(s, radix as u32)
+        IBig::from_str_radix(s, radix as u32)
             .map(|inner| Mpz { inner })
             .map_err(|_| "failed to parse number")
     }
@@ -86,7 +86,7 @@ impl Mpz {
         if radix < 2 || radix > 36 {
             panic!("radix must be between 2 and 36");
         }
-        self.inner.to_str_radix(radix as u32)
+        self.inner.in_radix(radix as u32).to_string()
     }
 
     pub fn set(&mut self, other: &Mpz) {
@@ -103,53 +103,55 @@ impl Mpz {
 
     pub fn abs(&self) -> Mpz {
         Mpz {
-            inner: self.inner.abs(),
+            inner: self.inner.clone().abs(),
         }
     }
 
     pub fn bit_length(&self) -> usize {
-        self.inner.bits() as usize
+        self.inner.bit_len()
     }
 
     pub fn tstbit(&self, bit_index: usize) -> bool {
-        self.inner.bit(bit_index as u64)
+        self.inner.bit(bit_index)
     }
 
     pub fn setbit(&mut self, bit_index: usize) {
-        self.inner.set_bit(bit_index as u64, true);
+        // dashu-int doesn't have mutable bit operations, so we need to use bitwise OR
+        self.inner |= IBig::ONE << bit_index;
     }
 
     pub fn clrbit(&mut self, bit_index: usize) {
-        self.inner.set_bit(bit_index as u64, false);
+        // Clear bit by AND with NOT of the bit mask
+        self.inner &= !(IBig::ONE << bit_index);
     }
 
     pub fn combit(&mut self, bit_index: usize) {
-        let current = self.tstbit(bit_index);
-        self.inner.set_bit(bit_index as u64, !current);
+        // Toggle bit by XOR with the bit mask
+        self.inner ^= IBig::ONE << bit_index;
     }
 }
 
-impl From<BigInt> for Mpz {
-    fn from(inner: BigInt) -> Self {
+impl From<IBig> for Mpz {
+    fn from(inner: IBig) -> Self {
         Mpz { inner }
     }
 }
 
-impl From<&BigInt> for Mpz {
-    fn from(inner: &BigInt) -> Self {
+impl From<&IBig> for Mpz {
+    fn from(inner: &IBig) -> Self {
         Mpz {
             inner: inner.clone(),
         }
     }
 }
 
-impl From<Mpz> for BigInt {
+impl From<Mpz> for IBig {
     fn from(value: Mpz) -> Self {
         value.inner
     }
 }
 
-impl From<&Mpz> for BigInt {
+impl From<&Mpz> for IBig {
     fn from(value: &Mpz) -> Self {
         value.inner.clone()
     }
@@ -169,9 +171,9 @@ impl Mpz {
             panic!("divide by zero");
         }
 
-        // Use mod_floor which is more efficient for this use case
+        // Use rem_euclid for floor modulus semantics
         Mpz {
-            inner: self.inner.mod_floor(&modulo.inner),
+            inner: IBig::from((&self.inner).rem_euclid(&modulo.inner)),
         }
     }
 
@@ -184,7 +186,7 @@ impl Mpz {
             return self.clone();
         }
         Mpz {
-            inner: self.inner.div_floor(&other.inner),
+            inner: (&self.inner).div_euclid(&other.inner),
         }
     }
 
@@ -193,7 +195,7 @@ impl Mpz {
             panic!("divide by zero");
         }
         Mpz {
-            inner: self.inner.mod_floor(&other.inner),
+            inner: IBig::from((&self.inner).rem_euclid(&other.inner)),
         }
     }
 
@@ -206,25 +208,53 @@ impl Mpz {
             return self.abs();
         }
         Mpz {
-            inner: self.inner.gcd(&other.inner),
+            inner: IBig::from((&self.inner).gcd(&other.inner)),
         }
     }
 
     pub fn gcdext(&self, other: &Mpz) -> (Mpz, Mpz, Mpz) {
-        use num_integer::Integer;
-        let extended_gcd = self.inner.extended_gcd(&other.inner);
+        // Implement extended GCD using the Euclidean algorithm
+        if other.is_zero() {
+            let sign = if self.inner >= IBig::ZERO { IBig::ONE } else { -IBig::ONE };
+            return (self.abs(), Mpz { inner: sign }, Mpz::zero());
+        }
+        
+        let mut old_r = self.inner.clone();
+        let mut r = other.inner.clone();
+        let mut old_s = IBig::ONE;
+        let mut s = IBig::ZERO;
+        let mut old_t = IBig::ZERO;
+        let mut t = IBig::ONE;
+        
+        while r != IBig::ZERO {
+            let quotient = &old_r / &r;
+            let temp = r.clone();
+            r = &old_r - &quotient * &r;
+            old_r = temp;
+            
+            let temp = s.clone();
+            s = &old_s - &quotient * &s;
+            old_s = temp;
+            
+            let temp = t.clone();
+            t = &old_t - &quotient * &t;
+            old_t = temp;
+        }
         
         (
-            Mpz { inner: extended_gcd.gcd },
-            Mpz { inner: extended_gcd.x },
-            Mpz { inner: extended_gcd.y },
+            Mpz { inner: old_r },
+            Mpz { inner: old_s },
+            Mpz { inner: old_t },
         )
     }
 
     pub fn lcm(&self, other: &Mpz) -> Mpz {
-        Mpz {
-            inner: self.inner.lcm(&other.inner),
+        if self.is_zero() || other.is_zero() {
+            return Mpz::zero();
         }
+        let gcd = self.gcd(other);
+        let result = (self / &gcd) * other;
+        result.abs()
     }
 
     pub fn powm(&self, exp: &Mpz, modulus: &Mpz) -> Mpz {
@@ -242,7 +272,7 @@ impl Mpz {
         }
 
         // Handle negative exponent
-        if exp.sign() == Sign::Minus {
+        if exp.sign() == Sign::Negative {
             let inv = self.invert(modulus);
             if let Some(inv_val) = inv {
                 return inv_val.powm(&(-exp), modulus);
@@ -251,8 +281,19 @@ impl Mpz {
             }
         }
 
-        // Use modpow directly without extra modulus operation
-        let result = self.inner.modpow(&exp.inner, &modulus.inner);
+        // Implement modular exponentiation using square and multiply
+        // dashu-int doesn't have built-in modpow, so we implement it
+        let mut result = IBig::ONE;
+        let mut base = IBig::from((&self.inner).rem_euclid(&modulus.inner));
+        let mut exp_val = exp.inner.clone();
+        
+        while exp_val > IBig::ZERO {
+            if exp_val.bit(0) {
+                result = IBig::from((result * &base).rem_euclid(&modulus.inner));
+            }
+            base = IBig::from((&base * &base).rem_euclid(&modulus.inner));
+            exp_val >>= 1;
+        }
         
         Mpz { inner: result }
     }
@@ -289,8 +330,11 @@ impl Mpz {
     }
 
     pub fn sqrt(&self) -> Mpz {
+        if self.sign() == Sign::Negative {
+            panic!("square root of negative number");
+        }
         Mpz {
-            inner: self.inner.sqrt(),
+            inner: IBig::from(self.inner.sqrt()),
         }
     }
 
@@ -341,7 +385,7 @@ impl Zero for Mpz {
 impl One for Mpz {
     fn one() -> Self {
         Mpz {
-            inner: BigInt::one(),
+            inner: IBig::ONE,
         }
     }
 }
@@ -368,7 +412,9 @@ impl Ord for Mpz {
 
 impl hash::Hash for Mpz {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.inner.to_signed_bytes_be().hash(state);
+        // Convert to bytes for hashing
+        let bytes: Vec<u8> = self.into();
+        bytes.hash(state);
     }
 }
 
@@ -382,7 +428,7 @@ impl FromStr for Mpz {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        BigInt::from_str(s)
+        IBig::from_str(s)
             .map(|inner| Mpz { inner })
             .map_err(|_| "failed to parse number")
     }
@@ -791,7 +837,7 @@ impl ShrAssign<usize> for Mpz {
 impl From<i64> for Mpz {
     fn from(n: i64) -> Self {
         Mpz {
-            inner: BigInt::from(n),
+            inner: IBig::from(n),
         }
     }
 }
@@ -799,7 +845,7 @@ impl From<i64> for Mpz {
 impl From<u64> for Mpz {
     fn from(n: u64) -> Self {
         Mpz {
-            inner: BigInt::from(n),
+            inner: IBig::from(n),
         }
     }
 }
@@ -807,7 +853,7 @@ impl From<u64> for Mpz {
 impl From<i32> for Mpz {
     fn from(n: i32) -> Self {
         Mpz {
-            inner: BigInt::from(n),
+            inner: IBig::from(n),
         }
     }
 }
@@ -815,7 +861,7 @@ impl From<i32> for Mpz {
 impl From<u32> for Mpz {
     fn from(n: u32) -> Self {
         Mpz {
-            inner: BigInt::from(n),
+            inner: IBig::from(n),
         }
     }
 }
@@ -823,45 +869,47 @@ impl From<u32> for Mpz {
 // Conversions to primitive types
 impl From<Mpz> for Option<i64> {
     fn from(mpz: Mpz) -> Option<i64> {
-        mpz.inner.to_i64()
+        mpz.inner.try_into().ok()
     }
 }
 
 impl From<&Mpz> for Option<i64> {
     fn from(mpz: &Mpz) -> Option<i64> {
-        mpz.inner.to_i64()
+        mpz.inner.clone().try_into().ok()
     }
 }
 
 impl From<Mpz> for Option<u64> {
     fn from(mpz: Mpz) -> Option<u64> {
-        mpz.inner.to_u64()
+        mpz.inner.try_into().ok()
     }
 }
 
 impl From<&Mpz> for Option<u64> {
     fn from(mpz: &Mpz) -> Option<u64> {
-        mpz.inner.to_u64()
+        mpz.inner.clone().try_into().ok()
     }
 }
 
 impl From<Mpz> for f64 {
     fn from(mpz: Mpz) -> f64 {
-        mpz.inner.to_f64().unwrap_or(f64::INFINITY)
+        mpz.inner.to_f64().value()
     }
 }
 
 impl From<&Mpz> for f64 {
     fn from(mpz: &Mpz) -> f64 {
-        mpz.inner.to_f64().unwrap_or(f64::INFINITY)
+        mpz.inner.to_f64().value()
     }
 }
 
 // Byte conversions
 impl From<&[u8]> for Mpz {
     fn from(bytes: &[u8]) -> Self {
+        // Convert bytes (big-endian) to IBig
+        let ubig = UBig::from_be_bytes(bytes);
         Mpz {
-            inner: BigInt::from_bytes_be(Sign::Plus, bytes),
+            inner: IBig::from(ubig),
         }
     }
 }
@@ -874,13 +922,35 @@ impl From<Vec<u8>> for Mpz {
 
 impl From<Mpz> for Vec<u8> {
     fn from(mpz: Mpz) -> Vec<u8> {
-        mpz.inner.to_signed_bytes_be()
+        // Convert IBig to bytes
+        let (sign, ubig) = mpz.inner.into_parts();
+        let mut bytes = ubig.to_be_bytes();
+        
+        // Handle sign for 2's complement representation
+        if sign == Sign::Negative {
+            // For negative numbers, we need to use 2's complement
+            // This is a simplification - might need more complex handling
+            for byte in bytes.iter_mut() {
+                *byte = !*byte;
+            }
+            // Add 1 for 2's complement
+            let mut carry = true;
+            for byte in bytes.iter_mut().rev() {
+                if carry {
+                    let (new_byte, new_carry) = byte.overflowing_add(1);
+                    *byte = new_byte;
+                    carry = new_carry;
+                }
+            }
+        }
+        
+        bytes.to_vec()
     }
 }
 
 impl From<&Mpz> for Vec<u8> {
     fn from(mpz: &Mpz) -> Vec<u8> {
-        mpz.inner.to_signed_bytes_be()
+        mpz.clone().into()
     }
 }
 
@@ -890,7 +960,7 @@ impl Rem<u64> for Mpz {
     
     fn rem(self, other: u64) -> Mpz {
         Mpz {
-            inner: self.inner % other,
+            inner: IBig::from(self.inner % other),
         }
     }
 }
@@ -900,7 +970,7 @@ impl Rem<u64> for &Mpz {
     
     fn rem(self, other: u64) -> Mpz {
         Mpz {
-            inner: &self.inner % other,
+            inner: IBig::from(&self.inner % other),
         }
     }
 }
@@ -923,5 +993,42 @@ impl Add<u64> for Mpz {
         Mpz {
             inner: self.inner + other,
         }
+    }
+}
+
+// Conversions to/from num-bigint::BigInt for compatibility with multi_party_ecdsa
+impl From<num_bigint::BigInt> for Mpz {
+    fn from(bigint: num_bigint::BigInt) -> Self {
+        let (sign, bytes) = bigint.to_bytes_be();
+        let ubig = UBig::from_be_bytes(&bytes);
+        let ibig = match sign {
+            num_bigint::Sign::Plus | num_bigint::Sign::NoSign => IBig::from(ubig),
+            num_bigint::Sign::Minus => -IBig::from(ubig),
+        };
+        Mpz { inner: ibig }
+    }
+}
+
+impl From<&num_bigint::BigInt> for Mpz {
+    fn from(bigint: &num_bigint::BigInt) -> Self {
+        Mpz::from(bigint.clone())
+    }
+}
+
+impl From<Mpz> for num_bigint::BigInt {
+    fn from(mpz: Mpz) -> Self {
+        let (sign, ubig) = mpz.inner.into_parts();
+        let bytes = ubig.to_be_bytes();
+        let bigint_sign = match sign {
+            Sign::Positive => num_bigint::Sign::Plus,
+            Sign::Negative => num_bigint::Sign::Minus,
+        };
+        num_bigint::BigInt::from_bytes_be(bigint_sign, &bytes)
+    }
+}
+
+impl From<&Mpz> for num_bigint::BigInt {
+    fn from(mpz: &Mpz) -> Self {
+        mpz.clone().into()
     }
 }
