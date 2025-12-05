@@ -144,22 +144,19 @@ pub fn mpz_sub(rop: &mut Mpz, op1: &Mpz, op2: &Mpz) {
 /// In-place subtraction: rop = rop - op
 #[inline]
 pub fn mpz_sub_self(rop: &mut Mpz, op: &Mpz) {
-    let tmp = &*rop - op;
-    *rop = tmp;
+    *rop -= op;
 }
 
 /// In-place addition: rop = rop + op
 #[inline]
 pub fn mpz_add_self(rop: &mut Mpz, op: &Mpz) {
-    let tmp = &*rop + op;
-    *rop = tmp;
+    *rop += op;
 }
 
 /// In-place multiplication: rop = rop * op
 #[inline]
 pub fn mpz_mul_self(rop: &mut Mpz, op: &Mpz) {
-    let tmp = &*rop * op;
-    *rop = tmp;
+    *rop *= op;
 }
 
 /// Exports `obj` to `v` as an array of 2's complement, big-endian

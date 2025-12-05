@@ -129,6 +129,32 @@ impl Mpz {
     }
 }
 
+impl From<BigInt> for Mpz {
+    fn from(inner: BigInt) -> Self {
+        Mpz { inner }
+    }
+}
+
+impl From<&BigInt> for Mpz {
+    fn from(inner: &BigInt) -> Self {
+        Mpz {
+            inner: inner.clone(),
+        }
+    }
+}
+
+impl From<Mpz> for BigInt {
+    fn from(value: Mpz) -> Self {
+        value.inner
+    }
+}
+
+impl From<&Mpz> for BigInt {
+    fn from(value: &Mpz) -> Self {
+        value.inner.clone()
+    }
+}
+
 // Sign-related methods
 impl Mpz {
     pub fn sign(&self) -> Sign {

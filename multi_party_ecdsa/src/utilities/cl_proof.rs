@@ -32,7 +32,7 @@ pub struct CLProof {
 
 impl CLProof {
     pub fn prove(group: &CLGroup, witness: CLWit, statement: CLState) -> Self {
-        let upper = &mpz_to_bigint(group.stilde.clone())
+        let upper = &mpz_to_bigint(&group.stilde)
             * BigInt::from(2i32).pow(40)
             * BigInt::from(2i32).pow(SECURITY_PARAMETER as u32)
             * BigInt::from(2i32).pow(40);
@@ -55,7 +55,7 @@ impl CLProof {
         let u1 = r1_mpz + &bigint_to_mpz(k.clone()) * &witness.r.0;
         let q_bigint = mpz_to_bigint(q());
         let u2 = mod_add(
-            &mpz_to_bigint(r2),
+            &mpz_to_bigint(&r2),
             &(&k * scalar_to_bigint(&witness.x)),
             &q_bigint,
         );
@@ -98,7 +98,7 @@ impl CLProof {
             &statement.cipher,
         );
 
-        let sample_size = &mpz_to_bigint(group.stilde.clone())
+        let sample_size = &mpz_to_bigint(&group.stilde)
             * BigInt::from(2i32).pow(40)
             * BigInt::from(2i32).pow(SECURITY_PARAMETER as u32)
             * (BigInt::from(2i32).pow(40) + BigInt::one());
@@ -108,7 +108,8 @@ impl CLProof {
             flag = false;
         }
         // length test u2:
-        if &self.u2 > &q() || &self.u2 < &Mpz::zero() {
+        let q_val = q();
+        if &self.u2 > &q_val || &self.u2 < &Mpz::zero() {
             flag = false;
         }
 
@@ -123,7 +124,7 @@ impl CLProof {
 
         let mut pku1 = statement.cl_pub_key.0;
         pku1.pow(self.u1.clone());
-        let fu2 = expo_f(&q(), &group.gq.discriminant(), &self.u2);
+        let fu2 = expo_f(&q_val, &group.gq.discriminant(), &self.u2);
         let mut c2k = statement.cipher.c2;
         c2k.pow(bigint_to_mpz(k));
         let t2c2k = self.t2.clone() * c2k;
