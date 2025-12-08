@@ -6,11 +6,3 @@ edition = "2018"
 [dependencies]
 libc = "0.2"
 serde = { version = "1.0", features = ["derive"] }
-
-[dev-dependencies]
-criterion = ">=0.2"
-
-[[bench]]
-name = "classgroup-bench"
-harness = false
-path = "bench/bench.rs"
