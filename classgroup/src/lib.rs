@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #![deny(unsafe_code)]
-use num_traits::{One, Zero};
 use std::ops::{Mul, MulAssign, Rem, ShlAssign};
 
 pub mod gmp;
@@ -23,9 +22,7 @@ pub use self::gmp_classgroup::{
     ffi::{export_obj, import_obj},
 };
 pub trait BigNum:
-    Zero
-    + One
-    + Clone
+    Clone
     + PartialOrd
     + std::fmt::Debug
     + Rem
@@ -43,6 +40,9 @@ pub trait BigNum:
     + Eq
     + std::hash::Hash
 {
+    fn one() -> Self;
+    fn zero() -> Self;
+    fn is_zero(&self) -> bool;
     fn probab_prime(&self, iterations: u32) -> bool;
     fn setbit(&mut self, offset: usize);
     fn mod_powm(&mut self, base: &Self, exponent: &Self, modulus: &Self);
@@ -147,7 +147,7 @@ pub trait ClassGroup:
     ///
     /// In debug builds, this will always panic if the discriminant is invalid.
     fn generator_for_discriminant(discriminant: Self::BigNum) -> Self {
-        Self::from_ab_discriminant(2.into(), One::one(), discriminant)
+        Self::from_ab_discriminant(2.into(), Self::BigNum::one(), discriminant)
     }
 
     /// Replaces `*self` with its inverse.

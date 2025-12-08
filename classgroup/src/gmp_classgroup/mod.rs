@@ -15,7 +15,6 @@
 use super::gmp::mpz::Mpz;
 use super::gmp::mpz::ProbabPrimeResult::NotPrime;
 use super::ClassGroup;
-use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Borrow,
@@ -338,6 +337,18 @@ impl<B: Borrow<GmpClassGroup>> MulAssign<B> for GmpClassGroup {
 }
 
 impl super::BigNum for Mpz {
+    fn one() -> Self {
+        Mpz::one()
+    }
+    
+    fn zero() -> Self {
+        Mpz::zero()
+    }
+    
+    fn is_zero(&self) -> bool {
+        self.is_zero()
+    }
+    
     fn probab_prime(&self, iterations: u32) -> bool {
         self.probab_prime(iterations.max(256) as _) != NotPrime
     }
@@ -494,7 +505,7 @@ impl ClassGroup for GmpClassGroup {
     }
 
     fn generator_for_discriminant(discriminant: Self::BigNum) -> Self {
-        let one: Mpz = One::one();
+        let one = Mpz::one();
         let x: Mpz = &one - &discriminant;
         let mut form = Self::new(2.into(), one, x.div_floor(&8.into()), discriminant);
         form.reduce();
@@ -551,7 +562,7 @@ impl Default for Ctx {
 }
 
 pub fn do_compute(discriminant: Mpz, iterations: u64) -> GmpClassGroup {
-    debug_assert!(discriminant < Zero::zero());
+    debug_assert!(discriminant < Mpz::zero());
     debug_assert!(discriminant.probab_prime(50) != NotPrime);
     let mut f = GmpClassGroup::generator_for_discriminant(discriminant);
     f.repeated_square(iterations);

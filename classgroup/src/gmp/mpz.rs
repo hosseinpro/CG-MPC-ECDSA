@@ -3,7 +3,6 @@
 #![allow(bare_trait_objects)]
 use super::sign::Sign;
 use libc::{c_char, c_double, c_int, c_long, c_ulong, c_void, size_t, strnlen};
-use num_traits::{One, Zero};
 use std::cmp::Ordering::{self, Equal, Greater, Less};
 use std::convert::From;
 use std::error::Error;
@@ -1135,24 +1134,5 @@ impl hash::Hash for Mpz {
                 limb.hash(state);
             }
         }
-    }
-}
-
-impl Zero for Mpz {
-    #[inline]
-    fn zero() -> Mpz {
-        Mpz::zero()
-    }
-
-    #[inline]
-    fn is_zero(&self) -> bool {
-        self.is_zero()
-    }
-}
-
-impl One for Mpz {
-    #[inline]
-    fn one() -> Mpz {
-        Mpz::one()
     }
 }
