@@ -1,5 +1,5 @@
 use super::mpz::mp_limb_t;
-use libc::c_int;
+use core::ffi::*;
 use std;
 
 #[link(name = "gmp")]

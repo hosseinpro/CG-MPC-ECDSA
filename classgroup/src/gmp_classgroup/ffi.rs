@@ -21,8 +21,8 @@
 #![allow(clashing_extern_declarations)]
 #![allow(deprecated)]
 pub use super::super::gmp::mpz::Mpz;
-use super::super::gmp::mpz::{mp_bitcnt_t, mp_limb_t};
-use libc::{c_int, c_long, c_ulong, c_void, size_t};
+use super::super::gmp::mpz::{mp_bitcnt_t, mp_limb_t, size_t};
+use core::ffi::*;
 // pub use c_ulong;
 use std::{mem::MaybeUninit, usize};
 // We use the unsafe versions to avoid unecessary allocations.

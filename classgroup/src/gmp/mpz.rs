@@ -2,7 +2,7 @@
 #![allow(deprecated)]
 #![allow(bare_trait_objects)]
 use super::sign::Sign;
-use libc::{c_char, c_double, c_int, c_long, c_ulong, c_void, size_t, strnlen};
+use core::ffi::*;
 use std::cmp::Ordering::{self, Equal, Greater, Less};
 use std::convert::From;
 use std::error::Error;
@@ -30,6 +30,7 @@ pub struct mpz_struct {
     _mp_d: *mut c_void,
 }
 
+pub type size_t = usize;
 pub type mp_limb_t = usize; // TODO: Find a way to use __gmp_bits_per_limb instead.
 pub type mp_bitcnt_t = c_ulong;
 pub type mpz_srcptr = *const mpz_struct;
@@ -230,7 +231,11 @@ impl Mpz {
             // Allocate and write into a raw *c_char of the correct length
             let mut vector: Vec<u8> = Vec::with_capacity(len);
             __gmpz_get_str(vector.as_mut_ptr() as *mut _, base as c_int, &self.mpz);
-            let string_len = strnlen(vector.as_ptr() as *const _, len);
+            // Find the null terminator by scanning the raw buffer
+            let ptr = vector.as_ptr();
+            let string_len = (0..len)
+                .find(|&i| *ptr.add(i) == 0)
+                .unwrap_or(len);
             assert!(string_len < len);
             vector.set_len(string_len);
             // FIXME is this actually a problem?
