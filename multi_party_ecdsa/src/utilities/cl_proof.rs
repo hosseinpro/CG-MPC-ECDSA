@@ -9,8 +9,15 @@ use k256::elliptic_curve::Field;
 use num_bigint::{BigInt, Sign};
 use sha2::{Sha256, Digest};
 use rand::rngs::OsRng;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MTAFirstRoundMsg {
+    pub proof: CLProof,
+    pub state: CLState,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CLState {
     pub cipher: Ciphertext,
     pub cl_pub_key: PK,
@@ -22,7 +29,7 @@ pub struct CLWit {
     pub r: SK,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CLProof {
     pub t1: GmpClassGroup,
     pub t2: GmpClassGroup,

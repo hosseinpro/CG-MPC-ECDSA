@@ -16,11 +16,6 @@ use std::str::FromStr;
 use std::{fmt, hash};
 use std::{i32, u32, usize};
 
-use serde::de;
-use serde::de::Visitor;
-use serde::ser::{Serialize, Serializer};
-use serde::{Deserialize, Deserializer};
-
 use super::ffi::*;
 
 #[repr(C)]
@@ -124,36 +119,68 @@ pub struct Mpz {
     mpz: mpz_struct,
 }
 
-const HEX_RADIX: u8 = 16;
-impl Serialize for Mpz {
+impl serde::Serialize for Mpz {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: Serializer,
+        S: serde::Serializer,
     {
-        serializer.serialize_str(&self.to_str_radix(HEX_RADIX))
+        // Serialize as bytes instead of hex string for compact representation
+        let bytes: Vec<u8> = self.into();
+        let sign = match self.sign() {
+            super::sign::Sign::Negative => -1i8,
+            super::sign::Sign::Zero => 0i8,
+            super::sign::Sign::Positive => 1i8,
+        };
+        // Store sign and bytes
+        use serde::ser::SerializeTuple;
+        let mut tuple = serializer.serialize_tuple(2)?;
+        tuple.serialize_element(&sign)?;
+        tuple.serialize_element(&bytes)?;
+        tuple.end()
     }
 }
 
-struct MpzVisitor;
-
-impl<'de> Deserialize<'de> for Mpz {
+impl<'de> serde::Deserialize<'de> for Mpz {
     fn deserialize<D>(deserializer: D) -> Result<Mpz, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
-        deserializer.deserialize_str(MpzVisitor)
-    }
-}
+        use serde::de::{SeqAccess, Visitor};
+        
+        struct MpzTupleVisitor;
+        
+        impl<'de> Visitor<'de> for MpzTupleVisitor {
+            type Value = Mpz;
 
-impl<'de> Visitor<'de> for MpzVisitor {
-    type Value = Mpz;
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a tuple of (sign, bytes)")
+            }
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("BigInt")
-    }
+            fn visit_seq<A>(self, mut seq: A) -> Result<Mpz, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let sign: i8 = seq.next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
+                let bytes: Vec<u8> = seq.next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
+                
+                if sign == 0 {
+                    return Ok(Mpz::zero());
+                }
+                
+                let mut mpz = Mpz::from(&bytes[..]);
+                
+                // Apply sign
+                if sign < 0 {
+                    mpz = -mpz;
+                }
+                
+                Ok(mpz)
+            }
+        }
 
-    fn visit_str<E: de::Error>(self, s: &str) -> Result<Mpz, E> {
-        Ok(Mpz::from_str_radix(s, HEX_RADIX).expect("Failed in serde"))
+        deserializer.deserialize_tuple(2, MpzTupleVisitor)
     }
 }
 

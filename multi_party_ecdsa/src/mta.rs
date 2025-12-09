@@ -28,7 +28,7 @@ impl PartyOne {
         }
     }
 
-    pub fn generate_send_msg(&self, cl_pk: &PK) -> (CLProof, CLState) {
+    pub fn generate_send_msg(&self, cl_pk: &PK) -> MTAFirstRoundMsg {
         let (c_b, r) = CLGroup::encrypt(&GROUP_128, cl_pk, &self.b);
         let witness = CLWit { x: self.b, r };
         let statement = CLState {
@@ -36,7 +36,10 @@ impl PartyOne {
             cl_pub_key: (*cl_pk).clone(),
         };
         let cl_proof = CLProof::prove(&GROUP_128, witness, statement.clone());
-        (cl_proof, statement)
+        MTAFirstRoundMsg {
+            proof: cl_proof,
+            state: statement,
+        }
     }
 
     pub fn handle_receive_msg(&mut self, cl_sk: &SK, c_a: &Ciphertext) {
@@ -54,19 +57,18 @@ impl PartyTwo {
 
     pub fn receive_and_send_msg(
         &mut self,
-        proof_cl: CLProof,
-        statement: CLState,
+        mta_msg: MTAFirstRoundMsg,
     ) -> Result<Ciphertext, String> {
         let alpha_tag = Scalar::random(&mut OsRng);
         let alpha = -alpha_tag;
         self.t_a = alpha;
 
         //verify cl-encryption dl proof
-        proof_cl
-            .verify(&GROUP_128, statement.clone())
+        mta_msg.proof
+            .verify(&GROUP_128, mta_msg.state.clone())
             .map_err(|_| "verify cl encryption dl proof failed")?;
-        let encrypted_alpha_tag = CLGroup::encrypt(&GROUP_128, &statement.cl_pub_key, &alpha_tag);
-        let a_scal_c_b = CLGroup::eval_scal(&statement.cipher, into_mpz(&self.a));
+        let encrypted_alpha_tag = CLGroup::encrypt(&GROUP_128, &mta_msg.state.cl_pub_key, &alpha_tag);
+        let a_scal_c_b = CLGroup::eval_scal(&mta_msg.state.cipher, into_mpz(&self.a));
         let c_a = CLGroup::eval_sum(&a_scal_c_b, &encrypted_alpha_tag.0);
         return Ok(c_a);
     }

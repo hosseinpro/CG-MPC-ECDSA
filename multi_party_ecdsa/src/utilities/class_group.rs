@@ -6,6 +6,7 @@ use k256::elliptic_curve::PrimeField;
 use num_bigint::{BigInt, Sign, RandBigInt};
 use std::str::FromStr;
 use rand::rngs::OsRng;
+use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
 use k256::elliptic_curve::Field;
@@ -19,10 +20,10 @@ pub struct CLGroup {
     pub stilde: Mpz,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PK(pub GmpClassGroup);
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Ciphertext {
     pub c1: GmpClassGroup,
     pub c2: GmpClassGroup,

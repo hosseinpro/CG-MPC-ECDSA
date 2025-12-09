@@ -3,6 +3,7 @@ use crate::utilities::SECURITY_BITS;
 use crate::utilities::k256_helpers::*;
 use k256::{ProjectivePoint, Scalar};
 use num_bigint::BigInt;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
 pub struct DlogCommitment {
@@ -22,7 +23,7 @@ pub struct DLComZK {
     pub witness: CommWitness,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DLCommitments {
     pub pk_commitment: BigInt,
     pub zk_pok_commitment: BigInt,
@@ -35,6 +36,80 @@ pub struct CommWitness {
     pub public_share: ProjectivePoint,
     pub d_log_proof: DLogProof<ProjectivePoint>,
 }
+
+impl serde::Serialize for CommWitness {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
+        let mut state = serializer.serialize_struct("CommWitness", 5)?;
+        state.serialize_field("pk_commitment_blind_factor", &self.pk_commitment_blind_factor)?;
+        state.serialize_field("zk_pok_blind_factor", &self.zk_pok_blind_factor)?;
+        // Serialize public_share as compressed bytes
+        let public_share_bytes = self.public_share.to_affine().to_encoded_point(true);
+        state.serialize_field("public_share", public_share_bytes.as_bytes())?;
+        // Serialize d_log_proof components
+        let pk_t_rand_commitment_bytes = self.d_log_proof.pk_t_rand_commitment.to_affine().to_encoded_point(true);
+        state.serialize_field("pk_t_rand_commitment", pk_t_rand_commitment_bytes.as_bytes())?;
+        state.serialize_field("challenge_response", &self.d_log_proof.challenge_response)?;
+        state.end()
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CommWitness {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de;
+        use k256::elliptic_curve::sec1::FromEncodedPoint;
+        use k256::EncodedPoint;
+        
+        #[derive(serde::Deserialize)]
+        struct Helper {
+            pk_commitment_blind_factor: BigInt,
+            zk_pok_blind_factor: BigInt,
+            public_share: Vec<u8>,
+            pk_t_rand_commitment: Vec<u8>,
+            challenge_response: Scalar,
+        }
+        
+        let helper = Helper::deserialize(deserializer)?;
+        
+        // Deserialize public_share
+        let public_share_encoded = EncodedPoint::from_bytes(&helper.public_share)
+            .map_err(de::Error::custom)?;
+        let public_share_affine = k256::AffinePoint::from_encoded_point(&public_share_encoded);
+        let public_share = if public_share_affine.is_some().into() {
+            ProjectivePoint::from(public_share_affine.unwrap())
+        } else {
+            return Err(de::Error::custom("invalid public_share point encoding"));
+        };
+        
+        // Deserialize pk_t_rand_commitment
+        let commitment_encoded = EncodedPoint::from_bytes(&helper.pk_t_rand_commitment)
+            .map_err(de::Error::custom)?;
+        let commitment_affine = k256::AffinePoint::from_encoded_point(&commitment_encoded);
+        let commitment_point = if commitment_affine.is_some().into() {
+            ProjectivePoint::from(commitment_affine.unwrap())
+        } else {
+            return Err(de::Error::custom("invalid commitment point encoding"));
+        };
+        
+        Ok(CommWitness {
+            pk_commitment_blind_factor: helper.pk_commitment_blind_factor,
+            zk_pok_blind_factor: helper.zk_pok_blind_factor,
+            public_share,
+            d_log_proof: DLogProof {
+                pk_t_rand_commitment: commitment_point,
+                challenge_response: helper.challenge_response,
+            },
+        })
+    }
+}
+
 
 impl DlogCommitment {
     pub fn new(public_share: &ProjectivePoint) -> Self {
