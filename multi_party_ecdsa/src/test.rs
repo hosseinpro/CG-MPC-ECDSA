@@ -70,8 +70,7 @@ fn party_two_test() {
 
     let mut party_one_sign = party_one::Sign::new(party_one_key).unwrap();
     let mut party_two_sign = party_two::Sign::new(party_two_key).unwrap();
-    party_one_sign.key_store = Some(party_one_key);
-    party_two_sign.key_store = Some(party_two_key);
+
     let party_two_nonce_com = party_two_sign.generate_nonce_com();
 
     // P1 -> P2: party_two_nonce_com 
@@ -164,7 +163,7 @@ fn party_two_test() {
     let k256_sig = k256::ecdsa::Signature::from_bytes(&signature).unwrap();
     
     // Get the public key in the right format
-    let public_key_point = party_one_sign.key_store.as_ref().unwrap().public_signing_key;
+    let public_key_point = party_one_sign.key_store.public_signing_key;
     let affine = public_key_point.to_affine();
     let encoded = affine.to_encoded_point(false);
     let verifying_key = VerifyingKey::from_sec1_bytes(encoded.as_bytes()).unwrap();

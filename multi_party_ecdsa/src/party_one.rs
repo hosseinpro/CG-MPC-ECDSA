@@ -15,7 +15,7 @@ pub struct Sign {
     pub dl_com_zk_com_rec: DLCommitments,
     pub reshared_secret_share: Scalar,
     pub reshared_public_share: ProjectivePoint,
-    pub key_store: Option<KeyStore>,
+    pub key_store: KeyStore,
     pub nonce_secret_share: Scalar,
     pub nonce_public_share: ProjectivePoint,
     pub r1: Scalar,
@@ -24,7 +24,7 @@ pub struct Sign {
 }
 
 impl Sign {
-    pub fn new() -> Result<Self, MulEcdsaError> {
+    pub fn new(key_store: KeyStore) -> Result<Self, MulEcdsaError> {
         let reshared_secret_share = Scalar::random(&mut OsRng);
         let reshared_public_share = ProjectivePoint::GENERATOR * reshared_secret_share;
         
@@ -36,7 +36,7 @@ impl Sign {
             dl_com_zk_com_rec: DLCommitments::default(),
             reshared_secret_share,
             reshared_public_share,
-            key_store: None,
+            key_store,
             nonce_secret_share,
             nonce_public_share,
             r1: Scalar::random(&mut OsRng),
@@ -55,14 +55,12 @@ impl Sign {
             + self.reshared_secret_share * self.r1
             - self
                 .key_store
-                .clone()
-                .unwrap()
                 .secret_share;
         MtaConsistencyMsg {
             reshared_public_share: self.reshared_public_share,
             r1: self.r1,
             cc,
-            public_key: self.key_store.clone().unwrap().public_share,
+            public_key: self.key_store.public_share,
         }
     }
 
@@ -110,7 +108,7 @@ impl Sign {
         let message = scalar_from_bigint(&message_bigint);
 
         signature.verify(
-            &self.key_store.clone().unwrap().public_signing_key,
+            &self.key_store.public_signing_key,
             &message,
         )?;
         return Ok(signature);

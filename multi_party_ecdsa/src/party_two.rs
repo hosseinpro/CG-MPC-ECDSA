@@ -13,7 +13,7 @@ pub struct Sign {
     pub nonce_secret_share: Scalar,
     pub nonce_public_share: ProjectivePoint,
     pub dl_com_zk_com: DLComZK,
-    pub key_store: Option<KeyStore>,
+    pub key_store: KeyStore,
     pub reshared_secret_share: Scalar,
     pub r1_rec: Scalar,
     pub r_x: Scalar,
@@ -21,7 +21,7 @@ pub struct Sign {
 }
 
 impl Sign {
-    pub fn new() -> Result<Self, MulEcdsaError> {
+    pub fn new(key_store: KeyStore) -> Result<Self, MulEcdsaError> {
         let nonce_secret_share = Scalar::random(&mut OsRng);
         let nonce_public_share = ProjectivePoint::GENERATOR * nonce_secret_share;
         let dl_com_zk_com = DLComZK::new(&nonce_secret_share, &nonce_public_share);
@@ -30,7 +30,7 @@ impl Sign {
             nonce_secret_share,
             nonce_public_share,
             dl_com_zk_com: dl_com_zk_com,
-            key_store: None,
+            key_store,
             reshared_secret_share: Scalar::random(&mut OsRng),
             r1_rec: Scalar::random(&mut OsRng),
             r_x: Scalar::random(&mut OsRng),
@@ -57,8 +57,6 @@ impl Sign {
         }
         let reshared_secret_share = self
             .key_store
-            .as_ref()
-            .unwrap()
             .secret_share
             - t_b
             - mta_consis_rec.cc;
