@@ -20,18 +20,13 @@ pub struct Sign {
     pub nonce_public_share: ProjectivePoint,
     pub r1: Scalar,
     pub r_x: Scalar,
-    pub message: Scalar,
     pub dl_proof: DLogProof<ProjectivePoint>,
 }
 
 impl Sign {
-    pub fn new(message_bytes: &[u8]) -> Result<Self, MulEcdsaError> {
+    pub fn new() -> Result<Self, MulEcdsaError> {
         let reshared_secret_share = Scalar::random(&mut OsRng);
         let reshared_public_share = ProjectivePoint::GENERATOR * reshared_secret_share;
-        
-        // Process the message to sign - convert bytes to BigInt
-        let message_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, message_bytes);
-        let message = scalar_from_bigint(&message_bigint);
         
         let nonce_secret_share = Scalar::random(&mut OsRng);
         let nonce_public_share = ProjectivePoint::GENERATOR * nonce_secret_share;
@@ -46,7 +41,6 @@ impl Sign {
             nonce_public_share,
             r1: Scalar::random(&mut OsRng),
             r_x: Scalar::random(&mut OsRng),
-            message,
             dl_proof,
         };
         Ok(ret)
@@ -97,7 +91,7 @@ impl Sign {
         Ok(())
     }
 
-    pub fn online_sign(&self, s2_rec: &Scalar) -> Result<Signature, MulEcdsaError> {
+    pub fn online_sign(&self, s2_rec: &Scalar, message_bytes: &[u8]) -> Result<Signature, MulEcdsaError> {
         let s_tag = self.nonce_secret_share.invert().unwrap_or(Scalar::ZERO)
             * (*s2_rec + self.r_x * self.reshared_secret_share);
         
@@ -110,9 +104,14 @@ impl Sign {
             r: self.r_x,
             s: scalar_from_bigint(&s),
         };
+
+        // Process the message to sign - convert bytes to BigInt
+        let message_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, message_bytes);
+        let message = scalar_from_bigint(&message_bigint);
+
         signature.verify(
             &self.key_store.clone().unwrap().public_signing_key,
-            &self.message,
+            &message,
         )?;
         return Ok(signature);
     }

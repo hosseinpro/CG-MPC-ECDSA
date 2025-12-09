@@ -68,8 +68,8 @@ fn party_two_test() {
     
     let start_time = std::time::Instant::now();
 
-    let mut party_one_sign = party_one::Sign::new(&message_hash).unwrap();
-    let mut party_two_sign = party_two::Sign::new(&message_hash).unwrap();
+    let mut party_one_sign = party_one::Sign::new(party_one_key).unwrap();
+    let mut party_two_sign = party_two::Sign::new(party_two_key).unwrap();
     party_one_sign.key_store = Some(party_one_key);
     party_two_sign.key_store = Some(party_two_key);
     let party_two_nonce_com = party_two_sign.generate_nonce_com();
@@ -141,7 +141,7 @@ fn party_two_test() {
         .verify_nonce_ke_msg(&party_two_nonce_ke_msg_deserialized)
         .unwrap();
 
-    let s_2 = party_two_sign.online_sign();
+    let s_2 = party_two_sign.online_sign(&message_hash);
 
     // P2 -> P1: s_2
     let s_2_serialized = bincode::serde::encode_to_vec(&s_2, standard()).unwrap();
@@ -149,7 +149,7 @@ fn party_two_test() {
     let (s_2_deserialized, _): (Scalar, usize) = 
         bincode::serde::decode_from_slice(&s_2_serialized, standard()).unwrap();
 
-    let signature = party_one_sign.online_sign(&s_2_deserialized).unwrap();
+    let signature = party_one_sign.online_sign(&s_2_deserialized, &message_hash).unwrap();
 
     let elapsed_time = start_time.elapsed();
     println!("Signing time: {} ms", elapsed_time.as_millis());

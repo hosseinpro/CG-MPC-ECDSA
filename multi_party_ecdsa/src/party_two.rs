@@ -14,7 +14,6 @@ pub struct Sign {
     pub nonce_public_share: ProjectivePoint,
     pub dl_com_zk_com: DLComZK,
     pub key_store: Option<KeyStore>,
-    pub message: Scalar,
     pub reshared_secret_share: Scalar,
     pub r1_rec: Scalar,
     pub r_x: Scalar,
@@ -22,20 +21,16 @@ pub struct Sign {
 }
 
 impl Sign {
-    pub fn new(message_bytes: &[u8]) -> Result<Self, MulEcdsaError> {
+    pub fn new() -> Result<Self, MulEcdsaError> {
         let nonce_secret_share = Scalar::random(&mut OsRng);
         let nonce_public_share = ProjectivePoint::GENERATOR * nonce_secret_share;
         let dl_com_zk_com = DLComZK::new(&nonce_secret_share, &nonce_public_share);
         
-        // Process the message to sign - convert bytes to BigInt
-        let message_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, message_bytes);
-        let message = scalar_from_bigint(&message_bigint);
         let ret = Self {
             nonce_secret_share,
             nonce_public_share,
             dl_com_zk_com: dl_com_zk_com,
             key_store: None,
-            message,
             reshared_secret_share: Scalar::random(&mut OsRng),
             r1_rec: Scalar::random(&mut OsRng),
             r_x: Scalar::random(&mut OsRng),
@@ -90,17 +85,13 @@ impl Sign {
         Ok(self.dl_com_zk_com.witness.clone())
     }
 
-    pub fn online_sign(&self) -> Scalar {
-        let s_2 = (self.r1_rec + self.nonce_secret_share).invert().unwrap_or(Scalar::ZERO)
-            * (self.message + self.r_x * self.reshared_secret_share);
-        return s_2;
-    }
-
-    pub fn set_msg(&mut self, message_bytes: &[u8]) -> Result<(), MulEcdsaError> {
+    pub fn online_sign(&self, message_bytes: &[u8]) -> Scalar {
+        // Process the message to sign - convert bytes to BigInt
         let message_bigint = BigInt::from_bytes_be(num_bigint::Sign::Plus, message_bytes);
-        let message: Scalar = scalar_from_bigint(&message_bigint);
-        self.message = message;
-        self.msg_set = true;
-        Ok(())
+        let message = scalar_from_bigint(&message_bigint);
+
+        let s_2 = (self.r1_rec + self.nonce_secret_share).invert().unwrap_or(Scalar::ZERO)
+            * (message + self.r_x * self.reshared_secret_share);
+        return s_2;
     }
 }
