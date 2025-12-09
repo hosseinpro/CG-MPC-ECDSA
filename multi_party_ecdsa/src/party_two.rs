@@ -7,22 +7,14 @@ use k256::elliptic_curve::Field;
 use crate::utilities::class_group::scalar_from_bigint;
 use num_bigint::BigInt;
 use rand::rngs::OsRng;
-
-#[derive(Clone, Debug)]
-pub struct KeyGenResult {
-    pub secret_share: Scalar,
-    pub public_share: ProjectivePoint,
-    pub public_signing_key: ProjectivePoint,
-    pub other_public_key: ProjectivePoint,
-}
-
+use crate::shared::KeyStore;
 
 #[derive(Clone, Debug)]
 pub struct Sign {
     pub nonce_secret_share: Scalar,
     pub nonce_public_share: ProjectivePoint,
     pub dl_com_zk_com: DLComZK,
-    pub keygen_result: Option<KeyGenResult>,
+    pub keygen_result: Option<KeyStore>,
     pub message: Scalar,
     pub reshared_secret_share: Scalar,
     pub r1_rec: Scalar,
@@ -61,15 +53,12 @@ impl Sign {
         &mut self,
         t_b: Scalar,
         mta_consis_rec: &MtaConsistencyMsg,
+        other_public_key: ProjectivePoint,
     ) -> Result<(), String> {
         if ProjectivePoint::GENERATOR * (t_b + mta_consis_rec.cc)
             != mta_consis_rec.reshared_public_share
                 * (mta_consis_rec.r1 + self.nonce_secret_share)
-                - self
-                    .keygen_result
-                    .as_ref()
-                    .unwrap()
-                    .other_public_key
+                - other_public_key
         {
             return Err("Verify Mta Consistency Failed".to_string());
         }

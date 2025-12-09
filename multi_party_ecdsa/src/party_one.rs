@@ -9,20 +9,14 @@ use num_bigint::BigInt;
 use rand::rngs::OsRng;
 use std::cmp;
 use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Debug)]
-pub struct KeyGenResult {
-    pub secret_share: Scalar,
-    pub public_share: ProjectivePoint,
-    pub public_signing_key: ProjectivePoint,
-}
+use crate::shared::KeyStore;
 
 #[derive(Clone, Debug)]
 pub struct Sign {
     pub dl_com_zk_com_rec: DLCommitments,
     pub reshared_secret_share: Scalar,
     pub reshared_public_share: ProjectivePoint,
-    pub keygen_result: Option<KeyGenResult>,
+    pub keygen_result: Option<KeyStore>,
     pub nonce_secret_share: Scalar,
     pub nonce_public_share: ProjectivePoint,
     pub r1: Scalar,

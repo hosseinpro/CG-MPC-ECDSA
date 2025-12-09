@@ -10,6 +10,7 @@ use k256::ecdsa::{VerifyingKey, signature::Verifier};
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use k256::ecdsa::signature::Signature;
 use bincode::config::standard;
+use crate::shared::KeyStore;
 
 #[test]
 fn mta_test() {
@@ -40,24 +41,23 @@ fn party_two_test() {
     let x2 = secret_key - x1;              // party_two's share
     
     // Create public shares from the secret shares
-   let party_one_public_share = k256::ProjectivePoint::GENERATOR * x1;
+    let party_one_public_share = k256::ProjectivePoint::GENERATOR * x1;
     let party_two_public_share = k256::ProjectivePoint::GENERATOR * x2;
     
     // Calculate the combined public key
     let public_signing_key = party_one_public_share + party_two_public_share;
     
     // Create KeyGenResult for both parties
-    let party_one_key = party_one::KeyGenResult {
+    let party_one_key = KeyStore {
         secret_share: x1,
         public_share: party_one_public_share,
         public_signing_key,
     };
     
-    let party_two_key = party_two::KeyGenResult {
+    let party_two_key = KeyStore {
         secret_share: x2,
         public_share: party_two_public_share,
         public_signing_key,
-        other_public_key: party_one_public_share,
     };
     // println!("party_one_key = {:?}", party_one_key);
     // println!("party_two_key = {:?}", party_two_key);
@@ -116,7 +116,7 @@ fn party_two_test() {
         bincode::serde::decode_from_slice(&mta_consistency_msg_serialized, standard()).unwrap();
 
     party_two_sign
-        .verify_generate_mta_consistency(mta_party_two.t_a, &mta_consistency_msg_deserialized)
+        .verify_generate_mta_consistency(mta_party_two.t_a, &mta_consistency_msg_deserialized, party_one_public_share)
         .unwrap();
 
     let party_one_nonce_ke_msg = party_one_sign.generate_nonce_ke_msg();
