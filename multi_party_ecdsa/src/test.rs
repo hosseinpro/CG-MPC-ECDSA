@@ -47,7 +47,7 @@ fn party_two_test() {
     // Calculate the combined public key
     let public_signing_key = party_one_public_share + party_two_public_share;
     
-    // Create KeyGenResult for both parties
+    // Create KeyStore for both parties
     let party_one_key = KeyStore {
         secret_share: x1,
         public_share: party_one_public_share,
@@ -70,8 +70,8 @@ fn party_two_test() {
 
     let mut party_one_sign = party_one::Sign::new(&message_hash).unwrap();
     let mut party_two_sign = party_two::Sign::new(&message_hash).unwrap();
-    party_one_sign.keygen_result = Some(party_one_key);
-    party_two_sign.keygen_result = Some(party_two_key);
+    party_one_sign.key_store = Some(party_one_key);
+    party_two_sign.key_store = Some(party_two_key);
     let party_two_nonce_com = party_two_sign.generate_nonce_com();
 
     // P1 -> P2: party_two_nonce_com 
@@ -164,7 +164,7 @@ fn party_two_test() {
     let k256_sig = k256::ecdsa::Signature::from_bytes(&signature).unwrap();
     
     // Get the public key in the right format
-    let public_key_point = party_one_sign.keygen_result.as_ref().unwrap().public_signing_key;
+    let public_key_point = party_one_sign.key_store.as_ref().unwrap().public_signing_key;
     let affine = public_key_point.to_affine();
     let encoded = affine.to_encoded_point(false);
     let verifying_key = VerifyingKey::from_sec1_bytes(encoded.as_bytes()).unwrap();

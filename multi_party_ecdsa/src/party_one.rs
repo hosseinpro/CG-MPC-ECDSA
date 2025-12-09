@@ -15,7 +15,7 @@ pub struct Sign {
     pub dl_com_zk_com_rec: DLCommitments,
     pub reshared_secret_share: Scalar,
     pub reshared_public_share: ProjectivePoint,
-    pub keygen_result: Option<KeyStore>,
+    pub key_store: Option<KeyStore>,
     pub nonce_secret_share: Scalar,
     pub nonce_public_share: ProjectivePoint,
     pub r1: Scalar,
@@ -41,7 +41,7 @@ impl Sign {
             dl_com_zk_com_rec: DLCommitments::default(),
             reshared_secret_share,
             reshared_public_share,
-            keygen_result: None,
+            key_store: None,
             nonce_secret_share,
             nonce_public_share,
             r1: Scalar::random(&mut OsRng),
@@ -60,7 +60,7 @@ impl Sign {
         let cc: Scalar = t_a
             + self.reshared_secret_share * self.r1
             - self
-                .keygen_result
+                .key_store
                 .clone()
                 .unwrap()
                 .secret_share;
@@ -68,7 +68,7 @@ impl Sign {
             reshared_public_share: self.reshared_public_share,
             r1: self.r1,
             cc,
-            public_key: self.keygen_result.clone().unwrap().public_share,
+            public_key: self.key_store.clone().unwrap().public_share,
         }
     }
 
@@ -111,7 +111,7 @@ impl Sign {
             s: scalar_from_bigint(&s),
         };
         signature.verify(
-            &self.keygen_result.clone().unwrap().public_signing_key,
+            &self.key_store.clone().unwrap().public_signing_key,
             &self.message,
         )?;
         return Ok(signature);

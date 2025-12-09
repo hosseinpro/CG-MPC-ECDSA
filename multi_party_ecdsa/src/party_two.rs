@@ -13,7 +13,7 @@ pub struct Sign {
     pub nonce_secret_share: Scalar,
     pub nonce_public_share: ProjectivePoint,
     pub dl_com_zk_com: DLComZK,
-    pub keygen_result: Option<KeyStore>,
+    pub key_store: Option<KeyStore>,
     pub message: Scalar,
     pub reshared_secret_share: Scalar,
     pub r1_rec: Scalar,
@@ -34,7 +34,7 @@ impl Sign {
             nonce_secret_share,
             nonce_public_share,
             dl_com_zk_com: dl_com_zk_com,
-            keygen_result: None,
+            key_store: None,
             message,
             reshared_secret_share: Scalar::random(&mut OsRng),
             r1_rec: Scalar::random(&mut OsRng),
@@ -61,7 +61,7 @@ impl Sign {
             return Err("Verify Mta Consistency Failed".to_string());
         }
         let reshared_secret_share = self
-            .keygen_result
+            .key_store
             .as_ref()
             .unwrap()
             .secret_share
