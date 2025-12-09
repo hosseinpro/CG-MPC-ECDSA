@@ -1,4 +1,3 @@
-use crate::party_one::{MtaConsistencyMsg, NonceKEMsg};
 use crate::utilities::dl_com_zk::*;
 use crate::utilities::error::MulEcdsaError;
 use crate::utilities::k256_helpers::DLogProof;
@@ -7,7 +6,7 @@ use k256::elliptic_curve::Field;
 use crate::utilities::class_group::scalar_from_bigint;
 use num_bigint::BigInt;
 use rand::rngs::OsRng;
-use crate::shared::KeyStore;
+use crate::shared::*;
 
 #[derive(Clone, Debug)]
 pub struct Sign {
@@ -53,12 +52,11 @@ impl Sign {
         &mut self,
         t_b: Scalar,
         mta_consis_rec: &MtaConsistencyMsg,
-        other_public_key: ProjectivePoint,
     ) -> Result<(), String> {
         if ProjectivePoint::GENERATOR * (t_b + mta_consis_rec.cc)
             != mta_consis_rec.reshared_public_share
                 * (mta_consis_rec.r1 + self.nonce_secret_share)
-                - other_public_key
+                - mta_consis_rec.public_key
         {
             return Err("Verify Mta Consistency Failed".to_string());
         }

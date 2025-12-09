@@ -10,7 +10,7 @@ use k256::ecdsa::{VerifyingKey, signature::Verifier};
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use k256::ecdsa::signature::Signature;
 use bincode::config::standard;
-use crate::shared::KeyStore;
+use crate::shared::*;
 
 #[test]
 fn mta_test() {
@@ -112,11 +112,11 @@ fn party_two_test() {
     // P1 -> P2: mta_consistency_msg
     let mta_consistency_msg_serialized = bincode::serde::encode_to_vec(&mta_consistency_msg, standard()).unwrap();
     println!("mta_consistency_msg: {} bytes", mta_consistency_msg_serialized.len());
-    let (mta_consistency_msg_deserialized, _): (party_one::MtaConsistencyMsg, usize) = 
+    let (mta_consistency_msg_deserialized, _): (MtaConsistencyMsg, usize) = 
         bincode::serde::decode_from_slice(&mta_consistency_msg_serialized, standard()).unwrap();
 
     party_two_sign
-        .verify_generate_mta_consistency(mta_party_two.t_a, &mta_consistency_msg_deserialized, party_one_public_share)
+        .verify_generate_mta_consistency(mta_party_two.t_a, &mta_consistency_msg_deserialized)
         .unwrap();
 
     let party_one_nonce_ke_msg = party_one_sign.generate_nonce_ke_msg();
@@ -124,7 +124,7 @@ fn party_two_test() {
     // P1 -> P2: party_one_nonce_ke_msg
     let party_one_nonce_ke_msg_serialized = bincode::serde::encode_to_vec(&party_one_nonce_ke_msg, standard()).unwrap();
     println!("party_one_nonce_ke_msg: {} bytes", party_one_nonce_ke_msg_serialized.len());
-    let (party_one_nonce_ke_msg_deserialized, _): (party_one::NonceKEMsg, usize) = 
+    let (party_one_nonce_ke_msg_deserialized, _): (NonceKEMsg, usize) = 
         bincode::serde::decode_from_slice(&party_one_nonce_ke_msg_serialized, standard()).unwrap();
 
     let party_two_nonce_ke_msg = party_two_sign
