@@ -13,14 +13,14 @@ use rand::rngs::OsRng;
 #[derive(Clone, Debug)]
 pub struct CLDLState {
     pub cipher: Ciphertext,
-    pub cl_pub_key: PK,
+    pub cl_pub_key: GmpClassGroup,
     pub dl_pub: ProjectivePoint,
 }
 
 #[derive(Clone, Debug)]
 pub struct CLDLWit {
     pub dl_priv: Scalar,
-    pub r: SK,
+    pub r: Mpz,
 }
 
 #[derive(Clone, Debug)]
@@ -43,7 +43,7 @@ impl CLDLProof {
         let r2_fe = Scalar::random(&mut OsRng);
         let r2 = into_mpz(&r2_fe);
         let fr2 = expo_f(&q(), &group.gq.discriminant(), &r2);
-        let mut pkr1 = statement.cl_pub_key.0.clone();
+        let mut pkr1 = statement.cl_pub_key.clone();
         pkr1.pow(r1_mpz.clone());
         let t2 = fr2 * pkr1;
         let t3 = ProjectivePoint::GENERATOR * r2_fe;
@@ -57,7 +57,7 @@ impl CLDLProof {
             &statement.cipher,
             &statement.dl_pub,
         );
-        let u1 = r1_mpz + &bigint_to_mpz(k.clone()) * &witness.r.0;
+        let u1 = r1_mpz + &bigint_to_mpz(k.clone()) * &witness.r;
         let q_bigint = mpz_to_bigint(q());
         let u2 = mod_add(
             &mpz_to_bigint(r2),
@@ -76,7 +76,7 @@ impl CLDLProof {
 
     /// Compute the Fiat-Shamir challenge for the proof.
     pub fn challenge(
-        public_key: &PK,
+        public_key: &GmpClassGroup,
         t1: GmpClassGroup,
         t2: GmpClassGroup,
         t3: ProjectivePoint,
@@ -89,7 +89,7 @@ impl CLDLProof {
         hasher.update(&x_bytes);
         hasher.update(ciphertext.c1.to_bytes().as_ref());
         hasher.update(ciphertext.c2.to_bytes().as_ref());
-        hasher.update(public_key.0.to_bytes().as_ref());
+        hasher.update(public_key.to_bytes().as_ref());
         hasher.update(t1.to_bytes().as_ref());
         hasher.update(t2.to_bytes().as_ref());
         let t3_bytes = t3.bytes_compressed_to_big_int();
@@ -146,7 +146,7 @@ impl CLDLProof {
             flag = false;
         }
 
-        let mut pku1 = statement.cl_pub_key.0;
+        let mut pku1 = statement.cl_pub_key;
         pku1.pow(self.u1.clone());
         let fu2 = expo_f(&q(), &group.gq.discriminant(), &self.u2);
         let mut c2k = statement.cipher.c2;

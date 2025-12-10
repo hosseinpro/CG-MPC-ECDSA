@@ -20,13 +20,13 @@ pub struct MTAFirstRoundMsg {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CLState {
     pub cipher: Ciphertext,
-    pub cl_pub_key: PK,
+    pub cl_pub_key: GmpClassGroup,
 }
 
 #[derive(Clone, Debug)]
 pub struct CLWit {
     pub x: Scalar,
-    pub r: SK,
+    pub r: Mpz,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -48,7 +48,7 @@ impl CLProof {
         let r2_fe = Scalar::random(&mut OsRng);
         let r2 = into_mpz(&r2_fe);
         let fr2 = expo_f(&q(), &group.gq.discriminant(), &r2);
-        let mut pkr1 = statement.cl_pub_key.0.clone();
+        let mut pkr1 = statement.cl_pub_key.clone();
         pkr1.pow(r1_mpz.clone());
         let t2 = fr2 * pkr1;
         let mut t1 = group.gq.clone();
@@ -59,7 +59,7 @@ impl CLProof {
             t2.clone(),
             &statement.cipher,
         );
-        let u1 = r1_mpz + &bigint_to_mpz(k.clone()) * &witness.r.0;
+        let u1 = r1_mpz + &bigint_to_mpz(k.clone()) * &witness.r;
         let q_bigint = mpz_to_bigint(q());
         let u2 = mod_add(
             &mpz_to_bigint(r2),
@@ -77,7 +77,7 @@ impl CLProof {
 
     /// Compute the Fiat-Shamir challenge for the proof.
     pub fn challenge(
-        public_key: &PK,
+        public_key: &GmpClassGroup,
         t1: GmpClassGroup,
         t2: GmpClassGroup,
         ciphertext: &Ciphertext,
@@ -85,7 +85,7 @@ impl CLProof {
         let mut hasher = Sha256::new();
         hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&ciphertext.c1.to_bytes()));
         hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&ciphertext.c2.to_bytes()));
-        hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&public_key.0.to_bytes()));
+        hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&public_key.to_bytes()));
         hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&t1.to_bytes()));
         hasher.update(<Vec<u8> as AsRef<[u8]>>::as_ref(&t2.to_bytes()));
         let hash256 = hasher.finalize();
@@ -128,7 +128,7 @@ impl CLProof {
             flag = false;
         };
 
-        let mut pku1 = statement.cl_pub_key.0;
+        let mut pku1 = statement.cl_pub_key;
         pku1.pow(self.u1.clone());
         let fu2 = expo_f(&q(), &group.gq.discriminant(), &self.u2);
         let mut c2k = statement.cipher.c2;

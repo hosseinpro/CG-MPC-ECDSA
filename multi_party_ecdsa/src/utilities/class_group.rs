@@ -18,40 +18,10 @@ pub struct CLGroup {
     pub stilde: Mpz,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PK(pub GmpClassGroup);
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Ciphertext {
     pub c1: GmpClassGroup,
     pub c2: GmpClassGroup,
-}
-
-impl From<PK> for GmpClassGroup {
-    fn from(pk: PK) -> Self {
-        pk.0
-    }
-}
-
-impl From<GmpClassGroup> for PK {
-    fn from(cl: GmpClassGroup) -> Self {
-        Self(cl)
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct SK(pub Mpz);
-
-impl From<SK> for Mpz {
-    fn from(sk: SK) -> Self {
-        sk.0
-    }
-}
-
-impl From<Mpz> for SK {
-    fn from(mpz: Mpz) -> Self {
-        Self(mpz)
-    }
 }
 
 impl CLGroup {
@@ -80,35 +50,35 @@ impl CLGroup {
         }
     }
 
-    pub fn keygen(&self) -> (SK, PK) {
+    pub fn keygen(&self) -> (Mpz, GmpClassGroup) {
         let upper = &(mpz_to_bigint(self.stilde.clone())) * BigInt::from(2i32).pow(40);
-        let sk = SK(bigint_to_mpz(sample_below(&upper)));
+        let sk = bigint_to_mpz(sample_below(&upper));
         let mut generator = self.gq.clone();
-        generator.pow(sk.clone().0);
-        let pk = PK(generator);
+        generator.pow(sk.clone());
+        let pk = generator;
         (sk, pk)
     }
 
-    pub fn encrypt(group: &CLGroup, public_key: &PK, m: &Scalar) -> (Ciphertext, SK) {
+    pub fn encrypt(group: &CLGroup, public_key: &GmpClassGroup, m: &Scalar) -> (Ciphertext, Mpz) {
         let k = into_mpz(m);
         let (r, r_big) = group.keygen();
         let delta = group.gq.discriminant().clone();
         let exp_f = expo_f(&q(), &delta, &k);
-        let mut h_exp_r = public_key.0.clone();
-        h_exp_r.pow(r.0.clone());
+        let mut h_exp_r = public_key.clone();
+        h_exp_r.pow(r.clone());
 
         (
             Ciphertext {
-                c1: r_big.0,
+                c1: r_big,
                 c2: h_exp_r * exp_f,
             },
             r,
         )
     }
 
-    pub fn decrypt(group: &CLGroup, secret_key: &SK, c: &Ciphertext) -> Scalar {
+    pub fn decrypt(group: &CLGroup, secret_key: &Mpz, c: &Ciphertext) -> Scalar {
         let mut c1_x_inv = c.c1.clone();
-        c1_x_inv.pow(secret_key.0.clone());
+        c1_x_inv.pow(secret_key.clone());
         c1_x_inv.inverse();
         let tmp = c.c2.clone() * &c1_x_inv;
         let plaintext = discrete_log_f(&q(), &group.gq.discriminant(), &tmp);
@@ -117,8 +87,8 @@ impl CLGroup {
         scalar_from_bigint(&plaintext_big)
     }
 
-    pub fn encrypt_without_r(group: &CLGroup, m: &Scalar) -> (Ciphertext, SK) {
-        let r = SK::from(Mpz::from(0));
+    pub fn encrypt_without_r(group: &CLGroup, m: &Scalar) -> (Ciphertext, Mpz) {
+        let r = Mpz::from(0);
         let r_big = group.pk_for_sk(r.clone());
         let m_bigint = scalar_to_bigint(m);
         let m_mpz = Mpz::from_str(&m_bigint.to_str_radix(10)).unwrap();
@@ -126,17 +96,17 @@ impl CLGroup {
 
         (
             Ciphertext {
-                c1: r_big.0,
+                c1: r_big,
                 c2: exp_f,
             },
             r,
         )
     }
 
-    pub fn pk_for_sk(&self, sk: SK) -> PK {
+    pub fn pk_for_sk(&self, sk: Mpz) -> GmpClassGroup {
         let mut group_element = self.gq.clone();
-        group_element.pow(sk.0);
-        PK(group_element)
+        group_element.pow(sk);
+        group_element
     }
 
     pub fn eval_scal(c: &Ciphertext, val: Mpz) -> Ciphertext {

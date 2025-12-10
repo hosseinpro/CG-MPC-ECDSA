@@ -1,5 +1,7 @@
 use crate::utilities::cl_proof::*;
 use crate::utilities::class_group::*;
+use classgroup::gmp::mpz::Mpz;
+use classgroup::gmp_classgroup::GmpClassGroup;
 use k256::Scalar;
 use k256::elliptic_curve::Field;
 use rand::rngs::OsRng;
@@ -8,8 +10,8 @@ use rand::rngs::OsRng;
 pub struct PartyOne {
     pub b: Scalar,
     pub t_b: Scalar,
-    pub cl_pub_key: PK,
-    pub cl_priv_key: SK,
+    pub cl_pub_key: GmpClassGroup,
+    pub cl_priv_key: Mpz,
 }
 
 #[derive(Clone, Debug)]
@@ -30,13 +32,13 @@ impl PartyOne {
         }
     }
 
-    pub fn generate_send_msg(&self, cl_pk: &PK) -> MTAFirstRoundMsg {
+    pub fn generate_send_msg(&self, cl_pk: &GmpClassGroup) -> MTAFirstRoundMsg {
         let group = CLGroup::new();
         let (c_b, r) = CLGroup::encrypt(&group, cl_pk, &self.b);
         let witness = CLWit { x: self.b, r };
         let statement = CLState {
             cipher: c_b,
-            cl_pub_key: (*cl_pk).clone(),
+            cl_pub_key: cl_pk.clone(),
         };
         let cl_proof = CLProof::prove(&group, witness, statement.clone());
         MTAFirstRoundMsg {
@@ -45,7 +47,7 @@ impl PartyOne {
         }
     }
 
-    pub fn handle_receive_msg(&mut self, cl_sk: &SK, c_a: &Ciphertext) {
+    pub fn handle_receive_msg(&mut self, cl_sk: &Mpz, c_a: &Ciphertext) {
         let group = CLGroup::new();
         self.t_b = CLGroup::decrypt(&group, cl_sk, c_a);
     }
