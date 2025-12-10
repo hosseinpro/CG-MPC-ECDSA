@@ -14,10 +14,10 @@
 #![deny(unsafe_code)]
 use std::ops::{Mul, MulAssign, Rem, ShlAssign};
 
-pub mod gmp;
+pub mod dashu;
 
-pub mod gmp_classgroup;
-pub use self::gmp_classgroup::{
+pub mod dashu_classgroup;
+pub use self::dashu_classgroup::{
     do_compute,
     ffi::{export_obj, import_obj},
 };

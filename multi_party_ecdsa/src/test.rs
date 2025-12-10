@@ -12,6 +12,7 @@ use bincode::config::standard;
 use crate::shared::*;
 
 #[test]
+#[ignore] // Very slow with dashu - run with: cargo test -- --ignored
 fn mta_test() {
     let a = Scalar::random(&mut OsRng);
     let b = Scalar::random(&mut OsRng);

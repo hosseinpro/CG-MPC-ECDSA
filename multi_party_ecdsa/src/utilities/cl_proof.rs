@@ -1,8 +1,8 @@
 use crate::utilities::class_group::*;
 use crate::utilities::error::MulEcdsaError;
 use crate::utilities::SECURITY_PARAMETER;
-use classgroup::gmp::mpz::Mpz;
-use classgroup::gmp_classgroup::*;
+use classgroup::dashu::bigint::BigInt as Mpz;
+use classgroup::dashu_classgroup::DashuClassGroup as GmpClassGroup;
 use classgroup::ClassGroup;
 use k256::Scalar;
 use k256::elliptic_curve::Field; 

@@ -1,7 +1,7 @@
 use crate::utilities::cl_proof::*;
 use crate::utilities::class_group::*;
-use classgroup::gmp::mpz::Mpz;
-use classgroup::gmp_classgroup::GmpClassGroup;
+use classgroup::dashu::bigint::BigInt as Mpz;
+use classgroup::dashu_classgroup::DashuClassGroup as GmpClassGroup;
 use k256::Scalar;
 use k256::elliptic_curve::Field;
 use rand::rngs::OsRng;
