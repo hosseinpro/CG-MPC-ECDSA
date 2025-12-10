@@ -16,7 +16,7 @@ use crate::shared::*;
 fn mta_test() {
     let a = Scalar::random(&mut OsRng);
     let b = Scalar::random(&mut OsRng);
-    let cl_keypair = ClKeyPair::new(&GROUP_128);
+    let cl_keypair = ClKeyPair::new(&CLGroup::new());
     let mut mta_party_one = mta::PartyOne::new(a);
     let mut mta_party_two = mta::PartyTwo::new(b);
     let mta_msg = mta_party_one.generate_send_msg(&cl_keypair.cl_pub_key);
@@ -26,6 +26,7 @@ fn mta_test() {
     mta_party_one.handle_receive_msg(&cl_keypair.cl_priv_key, &mta_second_round_msg);
     assert_eq!(a * b, mta_party_two.t_a + mta_party_one.t_b);
 }
+
 #[test]
 fn party_two_test() {
     // Import secret key
@@ -81,7 +82,7 @@ fn party_two_test() {
     party_one_sign.get_nonce_com(&party_two_nonce_com_deserialized);
 
     //mta begin;
-    let cl_keypair = ClKeyPair::new(&GROUP_128);
+    let cl_keypair = ClKeyPair::new(&CLGroup::new());
     let mut mta_party_one =
         mta::PartyOne::new(party_one_sign.reshared_secret_share);
     let mut mta_party_two = mta::PartyTwo::new(party_two_sign.nonce_secret_share);

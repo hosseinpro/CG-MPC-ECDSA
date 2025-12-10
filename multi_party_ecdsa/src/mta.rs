@@ -20,7 +20,7 @@ pub struct PartyTwo {
 
 impl PartyOne {
     pub fn new(b: Scalar) -> Self {
-        let cl_keypair = ClKeyPair::new(&GROUP_128);
+        let cl_keypair = ClKeyPair::new(&CLGroup::new());
         Self {
             b,
             t_b: Scalar::random(&mut OsRng),
@@ -29,13 +29,14 @@ impl PartyOne {
     }
 
     pub fn generate_send_msg(&self, cl_pk: &PK) -> MTAFirstRoundMsg {
-        let (c_b, r) = CLGroup::encrypt(&GROUP_128, cl_pk, &self.b);
+        let group = CLGroup::new();
+        let (c_b, r) = CLGroup::encrypt(&group, cl_pk, &self.b);
         let witness = CLWit { x: self.b, r };
         let statement = CLState {
             cipher: c_b,
             cl_pub_key: (*cl_pk).clone(),
         };
-        let cl_proof = CLProof::prove(&GROUP_128, witness, statement.clone());
+        let cl_proof = CLProof::prove(&group, witness, statement.clone());
         MTAFirstRoundMsg {
             proof: cl_proof,
             state: statement,
@@ -43,7 +44,8 @@ impl PartyOne {
     }
 
     pub fn handle_receive_msg(&mut self, cl_sk: &SK, c_a: &Ciphertext) {
-        self.t_b = CLGroup::decrypt(&GROUP_128, cl_sk, c_a);
+        let group = CLGroup::new();
+        self.t_b = CLGroup::decrypt(&group, cl_sk, c_a);
     }
 }
 
@@ -59,15 +61,16 @@ impl PartyTwo {
         &mut self,
         mta_msg: MTAFirstRoundMsg,
     ) -> Result<Ciphertext, String> {
+        let group = CLGroup::new();
         let alpha_tag = Scalar::random(&mut OsRng);
         let alpha = -alpha_tag;
         self.t_a = alpha;
 
         //verify cl-encryption dl proof
         mta_msg.proof
-            .verify(&GROUP_128, mta_msg.state.clone())
+            .verify(&group, mta_msg.state.clone())
             .map_err(|_| "verify cl encryption dl proof failed")?;
-        let encrypted_alpha_tag = CLGroup::encrypt(&GROUP_128, &mta_msg.state.cl_pub_key, &alpha_tag);
+        let encrypted_alpha_tag = CLGroup::encrypt(&group, &mta_msg.state.cl_pub_key, &alpha_tag);
         let a_scal_c_b = CLGroup::eval_scal(&mta_msg.state.cipher, into_mpz(&self.a));
         let c_a = CLGroup::eval_sum(&a_scal_c_b, &encrypted_alpha_tag.0);
         return Ok(c_a);
