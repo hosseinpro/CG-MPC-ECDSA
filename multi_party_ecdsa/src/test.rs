@@ -1,6 +1,5 @@
 use super::*;
 use crate::utilities::class_group::*;
-use crate::utilities::clkeypair::ClKeyPair;
 use k256::Scalar;
 use k256::elliptic_curve::Field;
 use k256::elliptic_curve::PrimeField;
@@ -16,14 +15,15 @@ use crate::shared::*;
 fn mta_test() {
     let a = Scalar::random(&mut OsRng);
     let b = Scalar::random(&mut OsRng);
-    let cl_keypair = ClKeyPair::new(&CLGroup::new());
+    let group = CLGroup::new();
+    let (cl_priv_key, cl_pub_key) = group.keygen();
     let mut mta_party_one = mta::PartyOne::new(a);
     let mut mta_party_two = mta::PartyTwo::new(b);
-    let mta_msg = mta_party_one.generate_send_msg(&cl_keypair.cl_pub_key);
+    let mta_msg = mta_party_one.generate_send_msg(&cl_pub_key);
     let mta_second_round_msg = mta_party_two
         .receive_and_send_msg(mta_msg)
         .unwrap();
-    mta_party_one.handle_receive_msg(&cl_keypair.cl_priv_key, &mta_second_round_msg);
+    mta_party_one.handle_receive_msg(&cl_priv_key, &mta_second_round_msg);
     assert_eq!(a * b, mta_party_two.t_a + mta_party_one.t_b);
 }
 
@@ -82,12 +82,13 @@ fn party_two_test() {
     party_one_sign.get_nonce_com(&party_two_nonce_com_deserialized);
 
     //mta begin;
-    let cl_keypair = ClKeyPair::new(&CLGroup::new());
+    let group = CLGroup::new();
+    let (cl_priv_key, cl_pub_key) = group.keygen();
     let mut mta_party_one =
         mta::PartyOne::new(party_one_sign.reshared_secret_share);
     let mut mta_party_two = mta::PartyTwo::new(party_two_sign.nonce_secret_share);
 
-    let mta_first_round_msg = mta_party_one.generate_send_msg(&cl_keypair.cl_pub_key);
+    let mta_first_round_msg = mta_party_one.generate_send_msg(&cl_pub_key);
 
     // P1 -> P2: mta_first_round_msg
     
@@ -106,7 +107,7 @@ fn party_two_test() {
     let (mta_second_round_msg_deserialized, _): (utilities::class_group::Ciphertext, usize) = 
         bincode::serde::decode_from_slice(&mta_second_round_msg_serialized, standard()).unwrap();
 
-    mta_party_one.handle_receive_msg(&cl_keypair.cl_priv_key, &mta_second_round_msg_deserialized);
+    mta_party_one.handle_receive_msg(&cl_priv_key, &mta_second_round_msg_deserialized);
     let mta_consistency_msg = party_one_sign.generate_mta_consistency(mta_party_one.t_b);
 
     // P1 -> P2: mta_consistency_msg

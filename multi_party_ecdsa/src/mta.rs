@@ -1,6 +1,5 @@
 use crate::utilities::cl_proof::*;
 use crate::utilities::class_group::*;
-use crate::utilities::clkeypair::*;
 use k256::Scalar;
 use k256::elliptic_curve::Field;
 use rand::rngs::OsRng;
@@ -9,7 +8,8 @@ use rand::rngs::OsRng;
 pub struct PartyOne {
     pub b: Scalar,
     pub t_b: Scalar,
-    pub cl_keypair: ClKeyPair,
+    pub cl_pub_key: PK,
+    pub cl_priv_key: SK,
 }
 
 #[derive(Clone, Debug)]
@@ -20,11 +20,13 @@ pub struct PartyTwo {
 
 impl PartyOne {
     pub fn new(b: Scalar) -> Self {
-        let cl_keypair = ClKeyPair::new(&CLGroup::new());
+        let group = CLGroup::new();
+        let (cl_priv_key, cl_pub_key) = group.keygen();
         Self {
             b,
             t_b: Scalar::random(&mut OsRng),
-            cl_keypair,
+            cl_pub_key,
+            cl_priv_key,
         }
     }
 
